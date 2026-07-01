@@ -105,6 +105,10 @@ describe('create-cella e2e', () => {
       expect(content).not.toContain('__project_name__');
       expect(content).not.toContain('__project_slug__');
     });
+
+    it('should remove the consumed config.template.ts from the fork', () => {
+      expect(existsSync(join(targetFolder, 'shared', 'config', 'config.template.ts'))).toBe(false);
+    });
   });
 
   describe('generated env configs', () => {

@@ -18,9 +18,9 @@ export const DESCRIPTION: string = packageJson.description;
 export const VERSION: string = packageJson.version;
 export const WEBSITE: string = packageJson.homepage;
 
-export function getHeaderLine(templateVersion?: string): string {
-  const leftText = `⧈ ${NAME} · ${VERSION} · cella ${templateVersion}`;
-  const left = `${pc.cyan(`⧈ ${NAME}`)} ${pc.dim(`· ${VERSION} · cella ${templateVersion}`)}`;
+export function getHeaderLine(): string {
+  const leftText = `⧈ ${NAME} · ${VERSION}`;
+  const left = `${pc.cyan(`⧈ ${NAME}`)} ${pc.dim(`· ${VERSION}`)}`;
   const right = pc.cyan(WEBSITE);
   const padding = Math.max(1, 60 - leftText.length - WEBSITE.length);
   return `${left}${' '.repeat(padding)}${right}`;
@@ -39,12 +39,9 @@ export const TO_COPY: Record<string, string> = {
 };
 
 /**
- * Placeholder config template that replaces `shared/config/config.default.ts` in new forks.
- * Ships inside the create-cella package (see package.json `files`) and is resolved relative
- * to the package — NOT the downloaded fork. Contains `__project_name__` and `__project_slug__`
- * tokens interpolated at create time.
+ * Fork config template that replaces `shared/config/config.default.ts` in new forks.
  */
-export const PLACEHOLDER_CONFIG = 'configs/default-config.ts.template';
+export const PLACEHOLDER_CONFIG = 'shared/config/config.template.ts';
 
 /**
  * Read a `.env.example` file and apply key=value replacements.

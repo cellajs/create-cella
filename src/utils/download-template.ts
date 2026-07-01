@@ -1,6 +1,8 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { parseTarGzip } from 'nanotar';
+import fs from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import git from 'isomorphic-git';
+import http from 'isomorphic-git/http/node';
 
 /** Parse `github:owner/repo` or `owner/repo` into its owner and repo parts. */
 function parseGithubRepo(template: string): { owner: string; repo: string } {
@@ -12,38 +14,24 @@ function parseGithubRepo(template: string): { owner: string; repo: string } {
 }
 
 /**
- * Downloads a GitHub repository tarball and extracts it into `targetFolder`.
+ * Clones a GitHub template into `targetFolder` using isomorphic-git (pure JS).
  *
- * Uses the codeload `tar.gz` endpoint with a plain `fetch` and pure-JS gunzip +
- * untar (nanotar, via the Web `DecompressionStream`). No git, no `child_process`,
- * so `create-cella` keeps a clean supply-chain profile (no shell access).
+ * A shallow, single-branch clone over HTTPS — no `git` binary, no `child_process`,
+ * so `create-cella` keeps a clean supply-chain profile (no shell access). Unlike a
+ * raw tarball parse, isomorphic-git reconstructs the tree itself, so file modes and
+ * long paths are always correct. The cloned `.git` history is discarded afterwards;
+ * scaffolding re-initialises the repo with a fresh initial commit.
  *
  * @param template - `github:owner/repo` (or `owner/repo`).
- * @param ref - Release tag, commit SHA, or branch to download.
- * @param targetFolder - Directory to extract the template into.
+ * @param ref - Branch or tag to check out (e.g. `main` or a release tag).
+ * @param targetFolder - Directory to clone the template into.
  */
 export async function downloadGithubTemplate(template: string, ref: string, targetFolder: string): Promise<void> {
   const { owner, repo } = parseGithubRepo(template);
-  const url = `https://codeload.github.com/${owner}/${repo}/tar.gz/${ref}`;
+  const url = `https://github.com/${owner}/${repo}.git`;
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to download template ${owner}/${repo}@${ref}: ${response.status} ${response.statusText}`);
-  }
+  await git.clone({ fs, http, dir: targetFolder, url, ref, singleBranch: true, depth: 1 });
 
-  const archive = new Uint8Array(await response.arrayBuffer());
-  const entries = await parseTarGzip(archive);
-
-  for (const entry of entries) {
-    if (entry.type !== 'file' || !entry.data) continue;
-    // GitHub nests everything under a top-level `repo-ref/` folder — strip it.
-    const relativePath = entry.name.replace(/^[^/]+\//, '');
-    if (!relativePath) continue;
-
-    const dest = join(targetFolder, relativePath);
-    await mkdir(dirname(dest), { recursive: true });
-    // Preserve the executable bit (nanotar reports mode as an octal string).
-    const mode = entry.attrs?.mode ? Number.parseInt(entry.attrs.mode, 8) : undefined;
-    await writeFile(dest, entry.data, mode ? { mode } : undefined);
-  }
+  // Drop the cloned history — the scaffold gets its own fresh initial commit.
+  await rm(join(targetFolder, '.git'), { recursive: true, force: true });
 }

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Supply-chain guard: create-cella must not use `child_process` (shell access).
  *
- * Scaffolding relies on isomorphic-git and a direct tarball download (nanotar),
+ * Scaffolding relies on isomorphic-git (a pure-JS shallow clone over HTTPS),
  * never the git binary or a package manager, so Socket's `shellAccess` capability
  * stays off the published package. This test scans the source tree (build-independent)
  * for any shell/child_process reference so a regression fails CI.

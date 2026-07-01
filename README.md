@@ -1,23 +1,12 @@
 # @cellajs/create-cella
 
-CLI tool to scaffold a new Cella project from the template.
-
-## Overview
-
-This CLI creates a new Cella project by downloading the latest template, scaffolding your project, and configuring git with upstream tracking for future syncs. It runs no shell commands and requires no `git` binary — git operations use [isomorphic-git](https://github.com/isomorphic-git/isomorphic-git) and the template is fetched and extracted in-process.
+CLI tool to scaffold a new Cella project from [the template](https://github.com/cellajs/cella).
 
 ## Usage
 
 ```bash
 pnpm create @cellajs/cella my-app
 ```
-
-Running without arguments starts interactive mode, prompting for:
-
-1. **Project name** – Directory name and package name
-2. **New branch** – Optionally create a dev branch alongside `main`
-3. **Directory conflict** – If target exists, choose to cancel or continue
-
 ## CLI Options
 
 ```bash

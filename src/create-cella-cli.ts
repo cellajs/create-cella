@@ -8,17 +8,13 @@ import { TEMPLATE_URL } from '#/constants';
 import { create } from '#/create';
 import { type CreateOptions, cli, confirmChoice, showWelcome } from '#/modules/cli';
 import { detectUsedPorts, findNextOffset } from '#/utils/detect-used-ports';
-import { extractPackageJsonVersionFromUri } from '#/utils/extract-package-json-version-from-uri';
 import { fetchLatestCommit, fetchLatestRelease } from '#/utils/fetch-template-metadata';
 import { isEmptyDirectory } from '#/utils/is-empty-directory';
 import { validateProjectName } from '#/utils/validate-project-name';
 
 async function main(): Promise<void> {
-  // Get the latest version of the template
-  const templateVersion = await extractPackageJsonVersionFromUri(TEMPLATE_URL);
-
   // Display CLI welcome banner
-  showWelcome(templateVersion);
+  showWelcome();
 
   // Shared theme to clear prompts after answering
   const promptTheme = { prefix: '', style: { answer: (text: string) => text } };
@@ -109,8 +105,8 @@ main().catch((error) => {
 /**
  * Show a short intro with the two starting points (latest release and latest
  * commit, each with its date) and let the user choose which template snapshot to
- * scaffold from. Returns the template ref (release tag or commit SHA), or undefined
- * to use the default branch (when metadata is unavailable).
+ * scaffold from. Returns the template ref to check out (release tag or `main`), or
+ * undefined to use the default branch (when metadata is unavailable).
  */
 async function promptTemplateRef(theme: object, context: object): Promise<string | undefined> {
   const [release, commit] = await Promise.all([fetchLatestRelease(TEMPLATE_URL), fetchLatestCommit(TEMPLATE_URL)]);
@@ -132,8 +128,15 @@ async function promptTemplateRef(theme: object, context: object): Promise<string
   console.info();
 
   // Only one available — use it without prompting.
-  if (!release) return commit?.sha;
+  if (!release) return 'main';
   if (!commit) return release.tag;
+
+  // Non-interactive (CI, piped stdin, no TTY): can't render the select — default to the
+  // latest release for a stable, reproducible scaffold rather than crashing the prompt.
+  if (!process.stdin.isTTY) {
+    confirmChoice('Latest release', release.tag);
+    return release.tag;
+  }
 
   const choice = await select(
     {
@@ -152,8 +155,10 @@ async function promptTemplateRef(theme: object, context: object): Promise<string
     confirmChoice('Latest release', release.tag);
     return release.tag;
   }
+  // "Latest commit" is the tip of main; check out the branch (shallow clones can't
+  // reliably fetch an arbitrary SHA over GitHub's smart-HTTP protocol).
   confirmChoice('Latest commit', commit.shortSha);
-  return commit.sha;
+  return 'main';
 }
 
 /** Format an offset as a port overview string, e.g. "10 → :3010 / :4010 / :5442" */
