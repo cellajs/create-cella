@@ -24,11 +24,23 @@ jobs:
       release-created: ${{ steps.release.outputs.release_created }}
       tag-name: ${{ steps.release.outputs.tag_name }}
     steps:
+      # Mint a short-lived token from the org release GitHub App. The org blocks
+      # the default GITHUB_TOKEN from creating pull requests, so release-please
+      # needs an App token to open (and later merge-detect) the release PR.
+      # Requires the App installed on this repo and the RELEASE_APP_ID /
+      # RELEASE_APP_PRIVATE_KEY org secrets shared with this repo.
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Run release-please
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
 
