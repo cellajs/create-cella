@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/cellajs/create-cella/compare/create-cella-0.3.0...create-cella-0.3.0) (2026-07-01)
+
+
+### 🧹 Chores
+
+* release 0.3.0 ([cb528ff](https://github.com/cellajs/create-cella/commit/cb528ffab6c95a5cdfe1530a8f88a8b29efa54aa))
+
 ## [0.2.3](https://github.com/cellajs/cella/compare/create-cella-0.2.2...create-cella-0.2.3) (2026-07-01)
 
 
