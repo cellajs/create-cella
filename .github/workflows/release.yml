@@ -54,12 +54,6 @@ jobs:
     permissions:
       contents: read
       id-token: write # npm provenance + OIDC trusted publishing
-    env:
-      # pnpm 11 runs an implicit deps-status check before `pnpm build` that
-      # re-enforces the minimum-release-age guard. Disable the guard for the
-      # whole release job (reviewed, integrity-pinned lockfile); CI still
-      # enforces it on every PR.
-      NPM_CONFIG_MINIMUM_RELEASE_AGE: "0"
     steps:
       - name: Checkout repo
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -81,7 +75,9 @@ jobs:
         run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0
 
       - name: Build
-        run: pnpm build
+        # pnpm runs an implicit deps-status check before the script; pass the
+        # same release-age bypass so it doesn't re-flag the (reviewed) lockfile.
+        run: pnpm --config.minimumReleaseAge=0 build
 
       # Prefer OIDC trusted publishing (tokenless). Configure the npm Trusted
       # Publisher for cellajs/create-cella + this workflow. NPM_TOKEN is a
