@@ -19,7 +19,7 @@ importers:
         version: 7.0.5
       isomorphic-git:
         specifier: ^1.38.5
-        version: 1.38.6
+        version: 1.38.5
       nanotar:
         specifier: ^0.3.0
         version: 0.3.0
@@ -68,7 +68,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.9
-        version: 4.1.9(@types/node@24.10.13)(vite@8.1.2(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4))
+        version: 4.1.9(@types/node@24.10.13)(vite@8.1.1(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4))
 
 packages:
 
@@ -1439,8 +1439,8 @@ packages:
   isarray@2.0.5:
     resolution: {integrity: sha512-xHjhDr3cNBK0BzdUJSPXZntQUx/mwMS5Rw4A7lPJ90XGAO6ISP/ePDNuo0vhqOZU+UD5JoodwCAAoZQd3FeAKw==}
 
-  isomorphic-git@1.38.6:
-    resolution: {integrity: sha512-lCmZ1m2R0LqbZ4QATtLCxhwNBQPNJc74R81dfyF90yLqP8xs2DZLedcnkVuRj6th/L2HYoIvWP5lBpS1ooAagw==}
+  isomorphic-git@1.38.5:
+    resolution: {integrity: sha512-4HBmx1UB+SdRaQh7+zN7lvFQxc4zl7s0oIM/1+5xveu6+QrOeFfx5QDeRNpqCzFHICISEdbK7GilsTsrgE006Q==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -1896,8 +1896,8 @@ packages:
     resolution: {integrity: sha512-SCv6OOV6Xj2/3cXy3dGmADluJTNcL3o7hZAglNPTe+WYuEuvxgJzxPrSDLZhF+CwyQOubqgecjMmTJGMVLWjYQ==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
 
-  vite@8.1.2:
-    resolution: {integrity: sha512-6YYPbRXTxx6bRXmOn7XdnQAy5DQNHhDgtjhDHI13oe4pY93kkcdGJWxpGwOm++/Wh0QpQhDrpIoVMrmrsI5AGQ==}
+  vite@8.1.1:
+    resolution: {integrity: sha512-X/05/cT+VITy2AeDc1der6smvGWWREtL4hPbPTaVbjSBuuWkmNOjR6HP3NzqcQA2nF6VHGUPaFRJyft/2AE9Kg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -2686,13 +2686,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.9(vite@8.1.2(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4))':
+  '@vitest/mocker@4.1.9(vite@8.1.1(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4))':
     dependencies:
       '@vitest/spy': 4.1.9
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.1.2(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4)
+      vite: 8.1.1(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4)
 
   '@vitest/pretty-format@4.1.9':
     dependencies:
@@ -3091,7 +3091,7 @@ snapshots:
 
   isarray@2.0.5: {}
 
-  isomorphic-git@1.38.6:
+  isomorphic-git@1.38.5:
     dependencies:
       async-lock: 1.4.1
       clean-git-ref: 2.0.1
@@ -3537,7 +3537,7 @@ snapshots:
 
   validate-npm-package-name@8.0.0: {}
 
-  vite@8.1.2(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4):
+  vite@8.1.1(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
@@ -3551,10 +3551,10 @@ snapshots:
       jiti: 2.6.1
       tsx: 4.22.4
 
-  vitest@4.1.9(@types/node@24.10.13)(vite@8.1.2(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4)):
+  vitest@4.1.9(@types/node@24.10.13)(vite@8.1.1(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4)):
     dependencies:
       '@vitest/expect': 4.1.9
-      '@vitest/mocker': 4.1.9(vite@8.1.2(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4))
+      '@vitest/mocker': 4.1.9(vite@8.1.1(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4))
       '@vitest/pretty-format': 4.1.9
       '@vitest/runner': 4.1.9
       '@vitest/snapshot': 4.1.9
@@ -3571,7 +3571,7 @@ snapshots:
       tinyexec: 1.2.4
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
-      vite: 8.1.2(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4)
+      vite: 8.1.1(@types/node@24.10.13)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.22.4)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 24.10.13
