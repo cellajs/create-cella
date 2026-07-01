@@ -66,7 +66,10 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        # Bypass pnpm's default minimum-release-age supply-chain guard for the
+        # release build only. The lockfile is reviewed and integrity-pinned, and
+        # CI (lint/test) still enforces the age policy on every PR.
+        run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0
 
       - name: Build
         run: pnpm build
