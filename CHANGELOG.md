@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/cellajs/create-cella/compare/create-cella-0.3.0...create-cella-0.3.1) (2026-07-01)
+
+
+### 🐞 Bug fixes
+
+* enforce minimumReleaseAge via config and age lockfile deps ([#2](https://github.com/cellajs/create-cella/issues/2)) ([29f2c7a](https://github.com/cellajs/create-cella/commit/29f2c7ab5b5b836fea219109927a9b18b2be8325))
+
 ## [0.3.0](https://github.com/cellajs/create-cella/compare/create-cella-0.3.0...create-cella-0.3.0) (2026-07-01)
 
 
