@@ -12,15 +12,14 @@ function showAscii(): void {
 
 /**
  * Displays the compact CLI welcome header.
- * @param templateVersion - The version of the cella template being used
  */
-export function showWelcome(templateVersion: string): void {
+export function showWelcome(): void {
   console.info();
   showAscii();
   console.info();
   console.info(pc.dim(DESCRIPTION));
   console.info();
-  console.info(getHeaderLine(templateVersion));
+  console.info(getHeaderLine());
   console.info(DIVIDER);
 }
 

@@ -59,7 +59,7 @@ export async function fetchLatestRelease(repositoryUrl: string): Promise<Release
       prerelease?: boolean;
     }>;
 
-    const release = releases.find((r) => !r.draft && !r.prerelease && /^v\d/.test(r.tag_name ?? ''));
+    const release = releases.find((r) => !r.draft && !r.prerelease && /^v?\d/.test(r.tag_name ?? ''));
     if (!release?.tag_name) return null;
 
     return { tag: release.tag_name, date: toDate(release.published_at) };

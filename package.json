@@ -19,7 +19,6 @@
   "type": "module",
   "main": "./dist/index.js",
   "files": [
-    "configs",
     "dist",
     "index.js",
     "README.md"
@@ -51,7 +50,6 @@
     "commander": "^15.0.0",
     "ignore": "^7.0.5",
     "isomorphic-git": "^1.38.5",
-    "nanotar": "^0.3.0",
     "ora": "^9.4.1",
     "picocolors": "^1.1.1",
     "validate-npm-package-name": "^8.0.0"

@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import pc from 'picocolors';
 import {
   generateEnvConfigs,
@@ -13,29 +12,6 @@ import {
 } from '#/constants';
 
 const warningMark = pc.yellow('⚠');
-
-/**
- * Resolve the placeholder config template that ships inside the create-cella package.
- *
- * The template is the CLI's own asset (listed in package.json `files`), NOT part of the
- * downloaded fork. It must therefore be read relative to this module, which lives at:
- *  - dev (tsx):   `<pkg>/src/utils/clean-template.ts`  → template at `../../<PLACEHOLDER_CONFIG>`
- *  - bundled:     `<pkg>/dist/index.js`                → template at `../<PLACEHOLDER_CONFIG>`
- */
-async function resolvePlaceholderConfigPath(): Promise<string> {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const candidates = [path.resolve(here, '../..', PLACEHOLDER_CONFIG), path.resolve(here, '..', PLACEHOLDER_CONFIG)];
-  for (const candidate of candidates) {
-    try {
-      await fs.access(candidate);
-      return candidate;
-    } catch {
-      // try next candidate
-    }
-  }
-  // Fall back to the first candidate so the caller surfaces a clear ENOENT.
-  return candidates[0];
-}
 
 /**
  * Cleans the specified template by removing designated folders and files.
@@ -70,7 +46,7 @@ export async function cleanTemplate({
         }
 
         // Replace config.default.ts with interpolated placeholder config
-        await applyPlaceholderConfig(targetFolder, projectName);
+        await applyPlaceholderConfig(targetFolder, projectName, displayName);
 
         // Generate backend .env from backend/.env.example.
         // The backend .env is the single source of truth for the project slug and DB ports
@@ -121,25 +97,18 @@ export async function cleanTemplate({
  * @param folderPath - The path of the folder to clean.
  */
 async function removeFolderContents(folderPath: string): Promise<void> {
-  // List all files in the folder
-  const files = await fs.readdir(folderPath);
+  // List all files in the folder. Skip silently if the folder doesn't exist —
+  // the template may not include every optional folder (e.g. backend/drizzle).
+  let files: string[];
+  try {
+    files = await fs.readdir(folderPath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw err;
+  }
 
-  await Promise.all(
-    files.map(async (file) => {
-      const filePath = path.join(folderPath, file);
-
-      // Get the file or folder statistics
-      const stat = await fs.lstat(filePath);
-
-      // If it's a directory, remove it and all its contents
-      if (stat.isDirectory()) {
-        await fs.rm(filePath, { recursive: true, force: true });
-      } else {
-        // If it's a file, remove it
-        await fs.rm(filePath);
-      }
-    }),
-  );
+  // `recursive: true` handles nested folders; `force: true` ignores races/missing entries.
+  await Promise.all(files.map((file) => fs.rm(path.join(folderPath, file), { recursive: true, force: true })));
 }
 
 /**
@@ -175,13 +144,13 @@ async function copyFile(src: string, dest: string): Promise<void> {
 }
 
 /**
- * Read the placeholder config template, interpolate project tokens, and
- * write it as `shared/config/config.default.ts` — replacing the original.
+ * Read the fork config template shipped inside the cloned Cella template
+ * (`shared/config/config.template.ts`), interpolate project tokens, write the
+ * result as `shared/config/config.default.ts` — replacing the original — and
+ * delete the now-consumed template from the fork.
  */
-async function applyPlaceholderConfig(targetFolder: string, projectName: string): Promise<void> {
-  const displayName = projectName.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-  const src = await resolvePlaceholderConfigPath();
+async function applyPlaceholderConfig(targetFolder: string, projectName: string, displayName: string): Promise<void> {
+  const src = path.resolve(targetFolder, PLACEHOLDER_CONFIG);
   const dest = path.resolve(targetFolder, './shared/config/config.default.ts');
 
   try {
@@ -189,9 +158,10 @@ async function applyPlaceholderConfig(targetFolder: string, projectName: string)
     content = content.replaceAll('__project_name__', displayName);
     content = content.replaceAll('__project_slug__', projectName);
     await fs.writeFile(dest, content, 'utf8');
+    await fs.rm(src, { force: true });
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.info(`\n${warningMark} Placeholder config "${src}" not found > Skip`);
+      console.info(`\n${warningMark} Fork config template "${src}" not found > Skip`);
     } else {
       throw err;
     }
