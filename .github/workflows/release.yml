@@ -9,6 +9,9 @@ permissions: {}
 on:
   push:
     branches: [main]
+  # Manual trigger to (re)run the publish job for the current main/tag, e.g. if a
+  # transient install/build failure blocked publishing after a release was cut.
+  workflow_dispatch:
 
 concurrency:
   group: release-${{ github.ref }}
@@ -46,11 +49,17 @@ jobs:
 
   publish:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release-created == 'true' }}
+    if: ${{ needs.release-please.outputs.release-created == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # npm provenance + OIDC trusted publishing
+    env:
+      # pnpm 11 runs an implicit deps-status check before `pnpm build` that
+      # re-enforces the minimum-release-age guard. Disable the guard for the
+      # whole release job (reviewed, integrity-pinned lockfile); CI still
+      # enforces it on every PR.
+      NPM_CONFIG_MINIMUM_RELEASE_AGE: "0"
     steps:
       - name: Checkout repo
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
