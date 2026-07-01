@@ -69,15 +69,10 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        # Bypass pnpm's default minimum-release-age supply-chain guard for the
-        # release build only. The lockfile is reviewed and integrity-pinned, and
-        # CI (lint/test) still enforces the age policy on every PR.
-        run: pnpm install --frozen-lockfile --config.minimumReleaseAge=0
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        # pnpm runs an implicit deps-status check before the script; pass the
-        # same release-age bypass so it doesn't re-flag the (reviewed) lockfile.
-        run: pnpm --config.minimumReleaseAge=0 build
+        run: pnpm build
 
       # Prefer OIDC trusted publishing (tokenless). Configure the npm Trusted
       # Publisher for cellajs/create-cella + this workflow. NPM_TOKEN is a
