@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 
 import { existsSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { input, select } from '@inquirer/prompts';
 import pc from 'picocolors';
@@ -54,7 +55,7 @@ async function main(): Promise<void> {
         theme: promptTheme,
         choices: [
           { name: 'Cancel and exit', value: 'cancel' },
-          { name: 'Ignore existing files and continue', value: 'ignore' },
+          { name: 'Remove existing files and continue', value: 'remove' },
         ],
       },
       promptContext,
@@ -62,6 +63,12 @@ async function main(): Promise<void> {
 
     if (action === 'cancel') {
       process.exit(1);
+    }
+
+    // Wipe the folder so the template clone starts from a clean slate. Leaving stale
+    // files behind makes the git checkout fail with conflicts on overlapping paths.
+    if (action === 'remove') {
+      await rm(targetFolder, { recursive: true, force: true });
     }
   }
 
