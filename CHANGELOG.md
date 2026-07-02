@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.3](https://github.com/cellajs/create-cella/compare/create-cella-0.3.2...create-cella-0.3.3) (2026-07-02)
+
+
+### 🎉 New features
+
+* record upstream base commit for sync bootstrapping ([#8](https://github.com/cellajs/create-cella/issues/8)) ([1a6ca5f](https://github.com/cellajs/create-cella/commit/1a6ca5fc78eb5b7dc34fa916628869f9a6cdeb98))
+* reset release-please, versioning, dedupe changelog ([d460792](https://github.com/cellajs/create-cella/commit/d46079200626cdaf9c5372f08dbda593aa83c5b1))
+
+
+### 🐞 Bug fixes
+
+* remove existing files before scaffolding into non-empty dir ([#6](https://github.com/cellajs/create-cella/issues/6)) ([7e403d4](https://github.com/cellajs/create-cella/commit/7e403d4b83b09c5ee4922f73b2f236b6cbef4a3e))
+
 ## [0.3.2](https://github.com/cellajs/create-cella/compare/create-cella-0.3.1...create-cella-0.3.2) (2026-07-01)
 
 
