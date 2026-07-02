@@ -10,6 +10,9 @@ export const DIVIDER = '─'.repeat(60);
 /** URL of the template repository */
 export const TEMPLATE_URL = 'github:cellajs/cella';
 
+/** Canonical owner/repo for template metadata fetched from the GitHub API. */
+export const TEMPLATE_REPOSITORY = 'cellajs/cella';
+
 /** URL to the repository */
 export const CELLA_REMOTE_URL = 'git@github.com:cellajs/cella.git';
 
@@ -33,7 +36,7 @@ export function getHeaderLine(): string {
 }
 
 // Files or folders to be removed from the template after downloading
-export const TO_REMOVE: string[] = ['./cli/create', './info/QUICKSTART.md', './infra/Pulumi.production.yaml'];
+export const TO_REMOVE: string[] = ['./infra/Pulumi.production.yaml'];
 
 // Specific folder contents to be cleaned out from the template
 export const TO_CLEAN: string[] = ['./backend/drizzle'];

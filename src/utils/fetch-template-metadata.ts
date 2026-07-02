@@ -5,12 +5,9 @@
  * Both helpers fail soft (return null) on network/API errors or rate limits — the
  * caller falls back to the default branch when metadata is unavailable.
  */
+import { TEMPLATE_REPOSITORY } from '#/constants';
 
-/** Parse 'github:owner/repo' (or 'owner/repo') into [owner, repo]. */
-function parseRepo(repositoryUrl: string): [string, string] {
-  const [owner, repo] = repositoryUrl.replace('github:', '').split('/');
-  return [owner, repo];
-}
+const TEMPLATE_METADATA_API_BASE = `https://api.github.com/repos/${TEMPLATE_REPOSITORY}`;
 
 /** Format an ISO timestamp as a locale-independent YYYY-MM-DD date. */
 function toDate(iso?: string): string {
@@ -44,9 +41,8 @@ export interface CommitInfo {
  * (`create-cella-v*`). We list releases (newest first) and pick the first
  * non-draft, non-prerelease `v*` release so the scaffolder version is ignored.
  */
-export async function fetchLatestRelease(repositoryUrl: string): Promise<ReleaseInfo | null> {
-  const [owner, repo] = parseRepo(repositoryUrl);
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/releases?per_page=30`;
+export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
+  const apiUrl = `${TEMPLATE_METADATA_API_BASE}/releases?per_page=30`;
 
   try {
     const response = await fetch(apiUrl, { headers: GITHUB_HEADERS });
@@ -69,9 +65,8 @@ export async function fetchLatestRelease(repositoryUrl: string): Promise<Release
 }
 
 /** Fetch the latest commit on a branch (defaults to 'main'). */
-export async function fetchLatestCommit(repositoryUrl: string, branch = 'main'): Promise<CommitInfo | null> {
-  const [owner, repo] = parseRepo(repositoryUrl);
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${branch}`;
+export async function fetchLatestCommit(branch = 'main'): Promise<CommitInfo | null> {
+  const apiUrl = `${TEMPLATE_METADATA_API_BASE}/commits/${branch}`;
 
   try {
     const response = await fetch(apiUrl, { headers: GITHUB_HEADERS });

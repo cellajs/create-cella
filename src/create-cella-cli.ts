@@ -116,7 +116,7 @@ main().catch((error) => {
  * undefined to use the default branch (when metadata is unavailable).
  */
 async function promptTemplateRef(theme: object, context: object): Promise<string | undefined> {
-  const [release, commit] = await Promise.all([fetchLatestRelease(TEMPLATE_URL), fetchLatestCommit(TEMPLATE_URL)]);
+  const [release, commit] = await Promise.all([fetchLatestRelease(), fetchLatestCommit()]);
 
   // No metadata (offline / rate-limited) — fall back to the default branch silently.
   if (!release && !commit) return undefined;
