@@ -27,7 +27,7 @@ export function getHeaderLine(): string {
 }
 
 // Files or folders to be removed from the template after downloading
-export const TO_REMOVE: string[] = ['./cli/create', './info/QUICKSTART.md'];
+export const TO_REMOVE: string[] = ['./cli/create', './info/QUICKSTART.md', './infra/Pulumi.production.yaml'];
 
 // Specific folder contents to be cleaned out from the template
 export const TO_CLEAN: string[] = ['./backend/drizzle'];
@@ -42,6 +42,12 @@ export const TO_COPY: Record<string, string> = {
  * Fork config template that replaces `shared/config/config.default.ts` in new forks.
  */
 export const PLACEHOLDER_CONFIG = 'shared/config/config.template.ts';
+
+/**
+ * Starting version for a fresh fork. Resets the upstream cella version so
+ * release-please cuts the fork's first release from a clean slate.
+ */
+export const INITIAL_VERSION = '0.0.0';
 
 /**
  * Read a `.env.example` file and apply key=value replacements.

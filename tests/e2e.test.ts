@@ -85,6 +85,29 @@ describe('create-cella e2e', () => {
     });
   });
 
+  describe('release/version reset', () => {
+    it('should set root package.json name to the project slug and version to 0.0.0', () => {
+      const pkg = JSON.parse(readFileSync(join(targetFolder, 'package.json'), 'utf-8'));
+      expect(pkg.name).toBe(projectName);
+      expect(pkg.version).toBe('0.0.0');
+    });
+
+    it('should reset the release-please manifest to 0.0.0', () => {
+      const manifest = JSON.parse(readFileSync(join(targetFolder, '.github/release-please-manifest.json'), 'utf-8'));
+      expect(manifest['.']).toBe('0.0.0');
+    });
+
+    it('should reset CHANGELOG.md to a fresh stub', () => {
+      const changelog = readFileSync(join(targetFolder, 'CHANGELOG.md'), 'utf-8');
+      expect(changelog.trim()).toBe('# Changelog');
+    });
+
+    it('should point release-please changelog-path at the root CHANGELOG.md', () => {
+      const config = JSON.parse(readFileSync(join(targetFolder, '.github/release-please-config.json'), 'utf-8'));
+      expect(config.packages['.']['changelog-path']).toBe('CHANGELOG.md');
+    });
+  });
+
   describe('git repository', () => {
     it('should have initialized git', () => {
       expect(existsSync(join(targetFolder, '.git'))).toBe(true);
