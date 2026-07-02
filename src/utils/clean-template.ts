@@ -5,6 +5,7 @@ import {
   generateEnvConfigs,
   generateEnvFromExample,
   getBackendEnvReplacements,
+  INITIAL_VERSION,
   PLACEHOLDER_CONFIG,
   TO_CLEAN,
   TO_COPY,
@@ -47,6 +48,9 @@ export async function cleanTemplate({
 
         // Replace config.default.ts with interpolated placeholder config
         await applyPlaceholderConfig(targetFolder, projectName, displayName);
+
+        // Reset release/versioning state so the fork starts under its own identity
+        await resetReleaseState(targetFolder, projectName);
 
         // Generate backend .env from backend/.env.example.
         // The backend .env is the single source of truth for the project slug and DB ports
@@ -166,4 +170,63 @@ async function applyPlaceholderConfig(targetFolder: string, projectName: string,
       throw err;
     }
   }
+}
+
+/**
+ * Reset the upstream cella release identity so the new fork starts clean:
+ * - root `package.json`: `name` → project slug, `version` → INITIAL_VERSION,
+ *   and blank out `license`/`repository`/`description`/`keywords`/`author`/`homepage`
+ *   (keys kept visible so the fork can fill in its own metadata)
+ * - `.github/release-please-manifest.json` → `{ ".": INITIAL_VERSION }`
+ * - `.github/release-please-config.json`: `changelog-path` → root `CHANGELOG.md`
+ *   (cella tracks its own changelog in `info/CHANGELOG.md`, which the fork keeps
+ *   as upstream reference; the fork's own releases write to a fresh root changelog)
+ * - `CHANGELOG.md` → fresh stub
+ */
+async function resetReleaseState(targetFolder: string, projectName: string): Promise<void> {
+  // Root package.json: rewrite only the top-level fields in place to avoid reformatting
+  // the whole file. Set name/version to the fork's identity, then blank out the upstream
+  // cella metadata (license, repository, description, keywords, author, homepage) while
+  // keeping the keys visible so the fork can fill them in.
+  const pkgPath = path.resolve(targetFolder, 'package.json');
+  try {
+    let pkg = await fs.readFile(pkgPath, 'utf8');
+    pkg = pkg.replace(/^(\s*"name":\s*)"[^"]*"/m, `$1"${projectName}"`);
+    pkg = pkg.replace(/^(\s*"version":\s*)"[^"]*"/m, `$1"${INITIAL_VERSION}"`);
+    // Empty each string field, keeping the key so the fork sees the shape.
+    for (const field of ['license', 'repository', 'description', 'author', 'homepage']) {
+      pkg = pkg.replace(new RegExp(`^(\\s*"${field}":\\s*)"[^"]*"`, 'm'), '$1""');
+    }
+    // Collapse the multi-line keywords array to an empty one.
+    pkg = pkg.replace(/^(\s*"keywords":\s*)\[[^\]]*\]/m, '$1[]');
+    await fs.writeFile(pkgPath, pkg, 'utf8');
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      console.info(`\n${warningMark} "package.json" not found > Skip version reset`);
+    } else {
+      throw err;
+    }
+  }
+
+  // Point release-please at a root CHANGELOG.md for the fork. Upstream cella writes to
+  // info/CHANGELOG.md (kept as-is for reference); the fork's own releases live at root.
+  const configPath = path.resolve(targetFolder, '.github/release-please-config.json');
+  try {
+    const config = await fs.readFile(configPath, 'utf8');
+    await fs.writeFile(configPath, config.replaceAll('info/CHANGELOG.md', 'CHANGELOG.md'), 'utf8');
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      console.info(`\n${warningMark} "release-please-config.json" not found > Skip changelog path reset`);
+    } else {
+      throw err;
+    }
+  }
+
+  // Reset the release-please manifest and changelog. `force: true` writes even if absent.
+  await fs.writeFile(
+    path.resolve(targetFolder, '.github/release-please-manifest.json'),
+    `{\n  ".": "${INITIAL_VERSION}"\n}\n`,
+    'utf8',
+  );
+  await fs.writeFile(path.resolve(targetFolder, 'CHANGELOG.md'), '# Changelog\n', 'utf8');
 }
