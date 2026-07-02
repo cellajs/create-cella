@@ -23,13 +23,11 @@ pnpm create @cellajs/cella [directory] [options]
 
 ## What It Does
 
-1. Downloads the latest Cella template as a GitHub tarball and extracts it in-process (no `git` binary, no shell)
-2. Cleans template files (removes cella-specific docs, configs) and interpolates the project config
+1. Downloads the latest Cella template as a GitHub tarball and extracts it in-process
+2. Cleans template files to replace cella-specific config
 3. Initializes a git repository with an initial commit via isomorphic-git
 4. Creates an optional working branch
 5. Adds Cella as the upstream remote for future syncs
-
-Dependency installation and migration generation are **not** run automatically — after scaffolding, run `pnpm install`, then `pnpm generate` (the CLI prints these next steps on success).
 
 ## Development
 
