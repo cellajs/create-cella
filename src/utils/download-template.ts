@@ -25,13 +25,21 @@ function parseGithubRepo(template: string): { owner: string; repo: string } {
  * @param template - `github:owner/repo` (or `owner/repo`).
  * @param ref - Branch or tag to check out (e.g. `main` or a release tag).
  * @param targetFolder - Directory to clone the template into.
+ * @returns The exact upstream commit SHA the template was scaffolded from.
  */
-export async function downloadGithubTemplate(template: string, ref: string, targetFolder: string): Promise<void> {
+export async function downloadGithubTemplate(template: string, ref: string, targetFolder: string): Promise<string> {
   const { owner, repo } = parseGithubRepo(template);
   const url = `https://github.com/${owner}/${repo}.git`;
 
   await git.clone({ fs, http, dir: targetFolder, url, ref, singleBranch: true, depth: 1 });
 
+  // Capture the exact commit the scaffold is based on before discarding history. This is
+  // recorded as sync provenance so `pnpm cella sync` can bootstrap a merge-base — the fork
+  // otherwise shares no history with upstream and the first sync would have nothing to diff.
+  const baseSha = await git.resolveRef({ fs, dir: targetFolder, ref: 'HEAD' });
+
   // Drop the cloned history — the scaffold gets its own fresh initial commit.
   await rm(join(targetFolder, '.git'), { recursive: true, force: true });
+
+  return baseSha;
 }

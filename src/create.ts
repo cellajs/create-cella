@@ -12,6 +12,7 @@ import { gitAddAll, gitCommit, gitInit } from '#/utils/git';
 import { listTemplateFiles } from '#/utils/list-template-files';
 import { createProgress, pauseSpinner, resumeSpinner } from '#/utils/progress';
 import { optionalModuleFolders, scanOptionalModules } from '#/utils/scan-optional-modules';
+import { writeScaffoldBase } from '#/utils/write-scaffold-base';
 
 /** Check if a path is a local directory */
 function isLocalPath(path: string): boolean {
@@ -47,6 +48,10 @@ export async function create({
     await mkdir(targetFolder, { recursive: true });
     process.chdir(targetFolder);
 
+    // Upstream commit the scaffold is based on (only known for remote templates). Recorded
+    // as sync provenance so the first `pnpm cella sync` can bootstrap a merge-base.
+    let baseSha: string | null = null;
+
     // Download or copy the template
     if (isLocalTemplate) {
       progress.step('copying local template');
@@ -77,7 +82,7 @@ export async function create({
       // Pin to the chosen ref (release tag or commit SHA), else the default branch.
       const ref = templateRef ?? 'main';
       progress.step(`downloading cella template${templateRef ? ` (${templateRef})` : ''}`);
-      await downloadGithubTemplate(template, ref, targetFolder);
+      baseSha = await downloadGithubTemplate(template, ref, targetFolder);
     }
 
     // Ask which optional modules to keep, then drop deselected paths
@@ -87,6 +92,10 @@ export async function create({
     progress.step('cleaning template');
     const displayName = projectName.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     await cleanTemplate({ targetFolder, projectName, displayName, portOffset, adminEmail });
+
+    // Record sync provenance before the initial commit so it is tracked. Enables the first
+    // `pnpm cella sync` to bootstrap a merge-base against a fork with no shared history.
+    if (baseSha) await writeScaffoldBase(targetFolder, baseSha);
 
     // Initialize git repository
     const gitFolderPath = join(targetFolder, '.git');

@@ -116,8 +116,16 @@ describe('create-cella e2e', () => {
     it('should have upstream remote configured', () => {
       const configPath = join(targetFolder, '.git', 'config');
       const config = readFileSync(configPath, 'utf-8');
-      expect(config).toContain('[remote "upstream"]');
+      expect(config).toContain('[remote "cella-upstream"]');
       expect(config).toContain('cellajs/cella');
+    });
+
+    it('should record the upstream base commit for sync bootstrapping', () => {
+      const basePath = join(targetFolder, '.cella', 'base');
+      expect(existsSync(basePath)).toBe(true);
+      const contents = readFileSync(basePath, 'utf-8');
+      // Must contain the exact 40-char upstream commit SHA the scaffold was based on.
+      expect(contents).toMatch(/^[0-9a-f]{40}$/m);
     });
   });
 
