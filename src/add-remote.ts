@@ -1,4 +1,4 @@
-import { CELLA_REMOTE_URL } from '#/constants';
+import { CELLA_REMOTE_NAME, CELLA_REMOTE_URL } from '#/constants';
 import type { AddRemoteOptions } from '#/modules/cli';
 import { gitRemoteAdd, gitRemoteGetUrl, gitRemoteRemove } from '#/utils/git';
 
@@ -10,7 +10,7 @@ import { gitRemoteAdd, gitRemoteGetUrl, gitRemoteRemove } from '#/utils/git';
 export async function addRemote({
   targetFolder,
   remoteUrl = CELLA_REMOTE_URL,
-  remoteName = 'upstream',
+  remoteName = CELLA_REMOTE_NAME,
   silent = false,
 }: AddRemoteOptions): Promise<void> {
   try {

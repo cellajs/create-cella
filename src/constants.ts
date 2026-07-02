@@ -13,6 +13,12 @@ export const TEMPLATE_URL = 'github:cellajs/cella';
 /** URL to the repository */
 export const CELLA_REMOTE_URL = 'git@github.com:cellajs/cella.git';
 
+/**
+ * Git remote name pointing at upstream cella. Matches the name the sync CLI
+ * (`pnpm cella`) expects, so scaffolds don't end up with a duplicate remote.
+ */
+export const CELLA_REMOTE_NAME = 'cella-upstream';
+
 /** Export details from package.json */
 export const DESCRIPTION: string = packageJson.description;
 export const VERSION: string = packageJson.version;

@@ -116,7 +116,7 @@ describe('create-cella e2e', () => {
     it('should have upstream remote configured', () => {
       const configPath = join(targetFolder, '.git', 'config');
       const config = readFileSync(configPath, 'utf-8');
-      expect(config).toContain('[remote "upstream"]');
+      expect(config).toContain('[remote "cella-upstream"]');
       expect(config).toContain('cellajs/cella');
     });
 
