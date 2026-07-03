@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.4](https://github.com/cellajs/create-cella/compare/create-cella-0.3.3...create-cella-0.3.4) (2026-07-03)
+
+
+### 🐞 Bug fixes
+
+* reset release changelog path ([#10](https://github.com/cellajs/create-cella/issues/10)) ([0696710](https://github.com/cellajs/create-cella/commit/0696710847c6063648fab22077d8e1d0b5a4fa89))
+
 ## [0.3.3](https://github.com/cellajs/create-cella/compare/create-cella-0.3.2...create-cella-0.3.3) (2026-07-02)
 
 

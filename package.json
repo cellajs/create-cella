@@ -1,6 +1,6 @@
 {
   "name": "@cellajs/create-cella",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": false,
   "license": "MIT",
   "description": "Cella is a TypeScript template to create web apps with sync and offline capabilities.",
