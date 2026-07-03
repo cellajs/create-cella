@@ -44,7 +44,7 @@ export const TO_CLEAN: string[] = ['./backend/drizzle'];
 // Files to copy/paste after downloading
 export const TO_COPY: Record<string, string> = {
   './frontend/.env.example': './frontend/.env',
-  './info/QUICKSTART.md': 'README.md',
+  './cella/QUICKSTART.md': 'README.md',
 };
 
 /**
