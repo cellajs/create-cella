@@ -179,8 +179,8 @@ async function applyPlaceholderConfig(targetFolder: string, projectName: string,
  *   (keys kept visible so the fork can fill in its own metadata)
  * - `.github/release-please-manifest.json` → `{ ".": INITIAL_VERSION }`
  * - `.github/release-please-config.json`: `changelog-path` → root `CHANGELOG.md`
- *   (cella tracks its own changelog in `cella/CHANGELOG.md`, which the fork keeps
- *   as upstream reference; the fork's own releases write to a fresh root changelog)
+ *   (cella tracks its own changelog in the template docs folder, which the fork
+ *   keeps as upstream reference; the fork's own releases write to a fresh root changelog)
  * - `CHANGELOG.md` → fresh stub
  */
 async function resetReleaseState(targetFolder: string, projectName: string): Promise<void> {
@@ -208,12 +208,17 @@ async function resetReleaseState(targetFolder: string, projectName: string): Pro
     }
   }
 
-  // Point release-please at a root CHANGELOG.md for the fork. Upstream cella writes to
-  // cella/CHANGELOG.md (kept as-is for reference); the fork's own releases live at root.
+  // Point release-please at a root CHANGELOG.md for the fork. The upstream Cella
+  // changelog stays wherever the template keeps it; the fork's own releases live at root.
   const configPath = path.resolve(targetFolder, '.github/release-please-config.json');
   try {
-    const config = await fs.readFile(configPath, 'utf8');
-    await fs.writeFile(configPath, config.replaceAll('cella/CHANGELOG.md', 'CHANGELOG.md'), 'utf8');
+    const config = JSON.parse(await fs.readFile(configPath, 'utf8')) as {
+      packages?: Record<string, Record<string, unknown>>;
+    };
+    config.packages ??= {};
+    config.packages['.'] ??= {};
+    config.packages['.']['changelog-path'] = 'CHANGELOG.md';
+    await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       console.info(`\n${warningMark} "release-please-config.json" not found > Skip changelog path reset`);
