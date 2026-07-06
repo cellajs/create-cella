@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.5](https://github.com/cellajs/create-cella/compare/create-cella-0.3.4...create-cella-0.3.5) (2026-07-06)
+
+
+### 🎉 New features
+
+* stamp scaffold provenance as a Cella-Base trailer, drop .cella/base ([#12](https://github.com/cellajs/create-cella/issues/12)) ([6323884](https://github.com/cellajs/create-cella/commit/63238848fcee15961224fffbbc463273dab4b8fa))
+
 ## [0.3.4](https://github.com/cellajs/create-cella/compare/create-cella-0.3.3...create-cella-0.3.4) (2026-07-03)
 
 
