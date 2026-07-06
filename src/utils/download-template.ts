@@ -33,9 +33,9 @@ export async function downloadGithubTemplate(template: string, ref: string, targ
 
   await git.clone({ fs, http, dir: targetFolder, url, ref, singleBranch: true, depth: 1 });
 
-  // Capture the exact commit the scaffold is based on before discarding history. This is
-  // recorded as sync provenance so `pnpm cella sync` can bootstrap a merge-base — the fork
-  // otherwise shares no history with upstream and the first sync would have nothing to diff.
+  // Capture the exact commit the scaffold is based on before discarding history. It is
+  // stamped as a `Cella-Base:` trailer on the initial commit, where the sync CLI reads it
+  // to bootstrap the first merge-base (the fork shares no git history with upstream).
   const baseSha = await git.resolveRef({ fs, dir: targetFolder, ref: 'HEAD' });
 
   // Drop the cloned history — the scaffold gets its own fresh initial commit.
