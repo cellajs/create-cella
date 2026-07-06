@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { checkbox } from '@inquirer/prompts';
 import pc from 'picocolors';
 import { addRemote } from '#/add-remote';
-import { TEMPLATE_URL } from '#/constants';
+import { CELLA_REMOTE_NAME, CELLA_REMOTE_URL, TEMPLATE_URL } from '#/constants';
 import { type CreateOptions, confirmChoice, showSuccess } from '#/modules/cli';
 import { cleanTemplate } from '#/utils/clean-template';
 import { downloadGithubTemplate } from '#/utils/download-template';
@@ -16,11 +16,6 @@ import { optionalModuleFolders, scanOptionalModules } from '#/utils/scan-optiona
 /** Check if a path is a local directory */
 function isLocalPath(path: string): boolean {
   return path.startsWith('/') || path.startsWith('./') || path.startsWith('../');
-}
-
-//  TODO review: this has a smell
-function shouldSkipStep(name: 'git' | 'remote'): boolean {
-  return process.env[`CREATE_CELLA_SKIP_${name.toUpperCase()}`] === 'true';
 }
 
 export async function create({
@@ -93,23 +88,28 @@ export async function create({
     const displayName = projectName.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     await cleanTemplate({ targetFolder, projectName, displayName, portOffset, adminEmail });
 
-    // Initialize git repository
+    // Initialize git repository and add the upstream remote. Non-fatal: the scaffold
+    // is already complete, so on failure we warn and hand the user the manual steps
+    // instead of tearing down an otherwise working project.
     const gitFolderPath = join(targetFolder, '.git');
-    if (!shouldSkipStep('git') && !existsSync(gitFolderPath)) {
-      progress.step('initializing git');
-      await gitInit(targetFolder);
-      await gitAddAll(targetFolder);
-      // The `Cella-Base:` trailer records the upstream commit this scaffold snapshot was
-      // taken from. The sync CLI reads it from the root commit to bootstrap the first
-      // merge-base — the fork's fresh history otherwise shares no ancestor with upstream.
-      const message = baseSha ? `Initial commit\n\nCella-Base: ${baseSha}` : 'Initial commit';
-      await gitCommit(targetFolder, message);
-    }
-
-    // Add upstream remote
-    if (!shouldSkipStep('remote')) {
+    try {
+      if (!existsSync(gitFolderPath)) {
+        progress.step('initializing git');
+        await gitInit(targetFolder);
+        await gitAddAll(targetFolder);
+        // The `Cella-Base:` trailer records the upstream commit this scaffold snapshot was
+        // taken from. The sync CLI reads it from the root commit to bootstrap the first
+        // merge-base — the fork's fresh history otherwise shares no ancestor with upstream.
+        const message = baseSha ? `Initial commit\n\nCella-Base: ${baseSha}` : 'Initial commit';
+        await gitCommit(targetFolder, message);
+      }
       progress.step('adding upstream remote');
-      await addRemote({ targetFolder, silent: true });
+      await addRemote({ targetFolder });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      progress.warn(
+        `${reason} — run 'git init' and 'git remote add ${CELLA_REMOTE_NAME} ${CELLA_REMOTE_URL}' manually`,
+      );
     }
 
     // Done

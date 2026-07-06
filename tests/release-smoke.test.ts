@@ -49,7 +49,7 @@ describe('release smoke', () => {
       maxBuffer: 10 * 1024 * 1024,
     });
 
-    // 3. Run the installed bin to scaffold from the real github template (git steps skipped).
+    // 3. Run the installed bin to scaffold from the real github template.
     const bin = join(installDir, 'node_modules', '.bin', 'create-cella');
     execFileSync(
       bin,
@@ -65,14 +65,13 @@ describe('release smoke', () => {
       {
         cwd: installDir,
         encoding: 'utf8',
-        env: {
-          ...process.env,
-          CREATE_CELLA_SKIP_GIT: 'true',
-          CREATE_CELLA_SKIP_REMOTE: 'true',
-        },
         maxBuffer: 10 * 1024 * 1024,
       },
     );
+
+    // Git init + upstream remote run for real (isomorphic-git, no network, no user config).
+    expect(existsSync(join(targetFolder, '.git'))).toBe(true);
+    expect(readFileSync(join(targetFolder, '.git', 'config'), 'utf8')).toContain('cellajs/cella');
 
     const backendEnvPath = join(targetFolder, 'backend', '.env');
     const developmentConfigPath = join(targetFolder, 'shared', 'config', 'config.development.ts');

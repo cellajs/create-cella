@@ -34,6 +34,4 @@ export interface AddRemoteOptions {
   targetFolder: string;
   remoteUrl?: string;
   remoteName?: string;
-  /** If true, don't throw on failure */
-  silent?: boolean;
 }

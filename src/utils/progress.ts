@@ -28,6 +28,8 @@ export function resumeSpinner(): void {
 export interface ProgressTracker {
   /** Update the current step (shown as spinner text) */
   step: (message: string) => void;
+  /** Mark the current step as skipped with a warning, then continue */
+  warn: (message: string) => void;
   /** Mark the tracker as complete with final message */
   done: (message: string) => void;
   /** Mark the tracker as failed with error message */
@@ -73,6 +75,15 @@ export function createProgress(title: string, silent = false): ProgressTracker {
       completedSteps.push(message);
       spinner.text = message;
       spinner.start();
+    },
+
+    warn: (message: string) => {
+      // Complete the current step with a yellow warning instead of a green check,
+      // then pop it so the next step()/done() doesn't re-log it with a check.
+      spinner.stop();
+      const current = completedSteps.pop();
+      if (current) log(`${pc.yellow('⚠')} ${current} ${pc.dim(`— ${message}`)}`);
+      else log(`${pc.yellow('⚠')} ${message}`);
     },
 
     done: (message: string) => {
