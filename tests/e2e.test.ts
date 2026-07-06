@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import fs, { existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import git from 'isomorphic-git';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { create } from '#/create';
 
@@ -120,12 +121,12 @@ describe('create-cella e2e', () => {
       expect(config).toContain('cellajs/cella');
     });
 
-    it('should record the upstream base commit for sync bootstrapping', () => {
-      const basePath = join(targetFolder, '.cella', 'base');
-      expect(existsSync(basePath)).toBe(true);
-      const contents = readFileSync(basePath, 'utf-8');
-      // Must contain the exact 40-char upstream commit SHA the scaffold was based on.
-      expect(contents).toMatch(/^[0-9a-f]{40}$/m);
+    it('should stamp the upstream base commit as a Cella-Base trailer on the initial commit', async () => {
+      // The sync CLI reads this trailer from the root commit to bootstrap the first
+      // merge-base. No worktree metadata is written (no `.cella/` directory).
+      const [head] = await git.log({ fs, dir: targetFolder, depth: 1 });
+      expect(head.commit.message).toMatch(/^Cella-Base: [0-9a-f]{40}$/m);
+      expect(existsSync(join(targetFolder, '.cella'))).toBe(false);
     });
   });
 

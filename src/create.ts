@@ -12,13 +12,13 @@ import { gitAddAll, gitCommit, gitInit } from '#/utils/git';
 import { listTemplateFiles } from '#/utils/list-template-files';
 import { createProgress, pauseSpinner, resumeSpinner } from '#/utils/progress';
 import { optionalModuleFolders, scanOptionalModules } from '#/utils/scan-optional-modules';
-import { writeScaffoldBase } from '#/utils/write-scaffold-base';
 
 /** Check if a path is a local directory */
 function isLocalPath(path: string): boolean {
   return path.startsWith('/') || path.startsWith('./') || path.startsWith('../');
 }
 
+//  TODO review: this has a smell
 function shouldSkipStep(name: 'git' | 'remote'): boolean {
   return process.env[`CREATE_CELLA_SKIP_${name.toUpperCase()}`] === 'true';
 }
@@ -48,8 +48,8 @@ export async function create({
     await mkdir(targetFolder, { recursive: true });
     process.chdir(targetFolder);
 
-    // Upstream commit the scaffold is based on (only known for remote templates). Recorded
-    // as sync provenance so the first `pnpm cella sync` can bootstrap a merge-base.
+    // Upstream commit the scaffold is based on (only known for remote templates). Stamped
+    // as a trailer on the initial commit so the sync CLI can bootstrap the first merge-base.
     let baseSha: string | null = null;
 
     // Download or copy the template
@@ -93,17 +93,17 @@ export async function create({
     const displayName = projectName.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     await cleanTemplate({ targetFolder, projectName, displayName, portOffset, adminEmail });
 
-    // Record sync provenance before the initial commit so it is tracked. Enables the first
-    // `pnpm cella sync` to bootstrap a merge-base against a fork with no shared history.
-    if (baseSha) await writeScaffoldBase(targetFolder, baseSha);
-
     // Initialize git repository
     const gitFolderPath = join(targetFolder, '.git');
     if (!shouldSkipStep('git') && !existsSync(gitFolderPath)) {
       progress.step('initializing git');
       await gitInit(targetFolder);
       await gitAddAll(targetFolder);
-      await gitCommit(targetFolder, 'Initial commit');
+      // The `Cella-Base:` trailer records the upstream commit this scaffold snapshot was
+      // taken from. The sync CLI reads it from the root commit to bootstrap the first
+      // merge-base — the fork's fresh history otherwise shares no ancestor with upstream.
+      const message = baseSha ? `Initial commit\n\nCella-Base: ${baseSha}` : 'Initial commit';
+      await gitCommit(targetFolder, message);
     }
 
     // Add upstream remote
