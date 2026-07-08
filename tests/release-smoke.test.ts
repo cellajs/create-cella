@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import nodeFs, { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import git from 'isomorphic-git';
 import { afterAll, describe, expect, it } from 'vitest';
 import packageJson from '../package.json' with { type: 'json' };
 
@@ -27,7 +28,7 @@ describe('release smoke', () => {
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it('packs, installs, and scaffolds via the installed bin with values propagated into env and config', () => {
+  it('packs, installs, and scaffolds via the installed bin with values propagated into env and config', async () => {
     // 1. Pack the built package into a tarball. `--ignore-scripts` keeps the `prepare` hook
     //    (lefthook) from writing to stdout and corrupting the `--json` output.
     const packOutput = execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', tempRoot], {
@@ -49,7 +50,8 @@ describe('release smoke', () => {
       maxBuffer: 10 * 1024 * 1024,
     });
 
-    // 3. Run the installed bin to scaffold from the real github template (git steps skipped).
+    // 3. Run the installed bin to scaffold from the real github template. Git steps run for
+    //    real — isomorphic-git works offline with an explicit author, so no git config needed.
     const bin = join(installDir, 'node_modules', '.bin', 'create-cella');
     execFileSync(
       bin,
@@ -65,11 +67,6 @@ describe('release smoke', () => {
       {
         cwd: installDir,
         encoding: 'utf8',
-        env: {
-          ...process.env,
-          CREATE_CELLA_SKIP_GIT: 'true',
-          CREATE_CELLA_SKIP_REMOTE: 'true',
-        },
         maxBuffer: 10 * 1024 * 1024,
       },
     );
@@ -94,5 +91,16 @@ describe('release smoke', () => {
     expect(developmentConfig).toContain("frontendUrl: 'http://localhost:3010'");
     expect(developmentConfig).toContain("backendUrl: 'http://localhost:4010'");
     expect(developmentConfig).toContain("backendAuthUrl: 'http://localhost:4010/auth'");
+
+    // Git steps run for real now — assert the repo was initialized, the root commit carries
+    // the `Cella-Base:` provenance trailer the sync CLI bootstraps its first merge-base from,
+    // and the upstream remote was added under the name the sync CLI expects.
+    expect(existsSync(join(targetFolder, '.git'))).toBe(true);
+
+    const [rootCommit] = await git.log({ fs: nodeFs, dir: targetFolder, depth: 1 });
+    expect(rootCommit.commit.message).toMatch(/^Cella-Base: [0-9a-f]{40}$/m);
+
+    const remotes = await git.listRemotes({ fs: nodeFs, dir: targetFolder });
+    expect(remotes.map((r) => r.remote)).toContain('cella-upstream');
   }, 300000);
 });

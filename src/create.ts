@@ -18,11 +18,6 @@ function isLocalPath(path: string): boolean {
   return path.startsWith('/') || path.startsWith('./') || path.startsWith('../');
 }
 
-//  TODO review: this has a smell
-function shouldSkipStep(name: 'git' | 'remote'): boolean {
-  return process.env[`CREATE_CELLA_SKIP_${name.toUpperCase()}`] === 'true';
-}
-
 export async function create({
   projectName,
   targetFolder,
@@ -93,24 +88,33 @@ export async function create({
     const displayName = projectName.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     await cleanTemplate({ targetFolder, projectName, displayName, portOffset, adminEmail });
 
-    // Initialize git repository
+    // Initialize git repository. Git runs offline via isomorphic-git with an explicit
+    // author, so it can't fail on missing user config — but if it fails for any other
+    // reason (permissions, disk) the project files are already written and usable, so
+    // warn and continue rather than aborting the whole scaffold.
     const gitFolderPath = join(targetFolder, '.git');
-    if (!shouldSkipStep('git') && !existsSync(gitFolderPath)) {
-      progress.step('initializing git');
-      await gitInit(targetFolder);
-      await gitAddAll(targetFolder);
-      // The `Cella-Base:` trailer records the upstream commit this scaffold snapshot was
-      // taken from. The sync CLI reads it from the root commit to bootstrap the first
-      // merge-base — the fork's fresh history otherwise shares no ancestor with upstream.
-      const message = baseSha ? `Initial commit\n\nCella-Base: ${baseSha}` : 'Initial commit';
-      await gitCommit(targetFolder, message);
+    if (!existsSync(gitFolderPath)) {
+      try {
+        progress.step('initializing git');
+        await gitInit(targetFolder);
+        await gitAddAll(targetFolder);
+        // The `Cella-Base:` trailer records the upstream commit this scaffold snapshot was
+        // taken from. The sync CLI reads it from the root commit to bootstrap the first
+        // merge-base — the fork's fresh history otherwise shares no ancestor with upstream.
+        const message = baseSha ? `Initial commit\n\nCella-Base: ${baseSha}` : 'Initial commit';
+        await gitCommit(targetFolder, message);
+      } catch (error) {
+        if (!silent) {
+          pauseSpinner();
+          console.warn(`${pc.yellow('⚠')} skipped git init: ${error instanceof Error ? error.message : String(error)}`);
+          resumeSpinner();
+        }
+      }
     }
 
-    // Add upstream remote
-    if (!shouldSkipStep('remote')) {
-      progress.step('adding upstream remote');
-      await addRemote({ targetFolder, silent: true });
-    }
+    // Add upstream remote (best-effort: addRemote swallows its own failures via `silent`).
+    progress.step('adding upstream remote');
+    await addRemote({ targetFolder, silent: true });
 
     // Done
     progress.done(pc.bold(`created ${projectName}`));
