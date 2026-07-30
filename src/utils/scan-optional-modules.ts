@@ -59,7 +59,7 @@ async function collectModuleFiles(dir: string, out: string[]): Promise<void> {
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       await collectModuleFiles(join(dir, entry.name), out);
-    } else if (entry.name.endsWith('-module.ts')) {
+    } else if (entry.name.endsWith('-module.ts') || entry.name.endsWith('-module.tsx')) {
       out.push(join(dir, entry.name));
     }
   }
