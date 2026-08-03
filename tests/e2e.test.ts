@@ -107,6 +107,18 @@ describe('create-cella e2e', () => {
       const config = JSON.parse(readFileSync(join(targetFolder, '.github/release-please-config.json'), 'utf-8'));
       expect(config.packages['.']['changelog-path']).toBe('CHANGELOG.md');
     });
+
+    it('should seed the cella migrations applied-set with every manifest id', () => {
+      // A fresh scaffold is at template HEAD, so run.ts must report zero pending migrations.
+      const manifest = JSON.parse(readFileSync(join(targetFolder, 'cella/migrations/manifest.json'), 'utf-8')) as {
+        migrations: { id: string }[];
+      };
+      const applied = JSON.parse(readFileSync(join(targetFolder, 'cella/cella.migrations.json'), 'utf-8')) as {
+        applied: string[];
+      };
+      expect(applied.applied).toEqual(manifest.migrations.map((m) => m.id).sort());
+      expect(applied.applied.length).toBeGreaterThan(0);
+    });
   });
 
   describe('git repository', () => {

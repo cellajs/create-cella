@@ -52,6 +52,10 @@ export async function cleanTemplate({
         // Reset release/versioning state so the fork starts under its own identity
         await resetReleaseState(targetFolder, projectName);
 
+        // Seed the cella migrations applied-set: a fresh scaffold is at template HEAD,
+        // so every migration in the template's manifest is already in the code
+        await seedMigrationsAppliedSet(targetFolder);
+
         // Generate backend .env from backend/.env.example.
         // The backend .env is the single source of truth for the project slug and DB ports
         // (consumed by backend/compose.yaml). There is no root .env.
@@ -166,6 +170,32 @@ async function applyPlaceholderConfig(targetFolder: string, projectName: string,
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       console.info(`\n${warningMark} Fork config template "${src}" not found > Skip`);
+    } else {
+      throw err;
+    }
+  }
+}
+
+/**
+ * Seed `cella/cella.migrations.json` with every migration id in the template's
+ * `cella/migrations/manifest.json`. A fresh scaffold is a snapshot of template HEAD,
+ * so all of those migrations are already applied in the downloaded code — without
+ * this file, `cella/migrations/run.ts` would report the full history as pending.
+ * Only migrations arriving through later upstream syncs should ever show up there.
+ */
+async function seedMigrationsAppliedSet(targetFolder: string): Promise<void> {
+  const manifestPath = path.resolve(targetFolder, 'cella/migrations/manifest.json');
+  const appliedPath = path.resolve(targetFolder, 'cella/cella.migrations.json');
+
+  try {
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      migrations?: { id: string }[];
+    };
+    const applied = (manifest.migrations ?? []).map((m) => m.id).sort();
+    await fs.writeFile(appliedPath, `${JSON.stringify({ applied }, null, 2)}\n`, 'utf8');
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      console.info(`\n${warningMark} "cella/migrations/manifest.json" not found > Skip migrations applied-set`);
     } else {
       throw err;
     }
