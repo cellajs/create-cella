@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.6](https://github.com/cellajs/create-cella/compare/create-cella-0.3.5...create-cella-0.3.6) (2026-08-03)
+
+
+### 🐞 Bug fixes
+
+* scan *-module.tsx files for optional modules ([#16](https://github.com/cellajs/create-cella/issues/16)) ([89b33fd](https://github.com/cellajs/create-cella/commit/89b33fd0b32325036aa900542ef10dca189c6a1d))
+* seed the cella migrations applied-set on scaffold ([#18](https://github.com/cellajs/create-cella/issues/18)) ([dd55147](https://github.com/cellajs/create-cella/commit/dd551476510524afad6c9a9ddffcb2b4dd8a8721))
+
 ## [0.3.5](https://github.com/cellajs/create-cella/compare/create-cella-0.3.4...create-cella-0.3.5) (2026-07-06)
 
 
