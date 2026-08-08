@@ -118,7 +118,7 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
   const be = 4000 + portOffset;
 
   const header =
-    "import type { DeepPartial } from '../src/config-builder/types';\nimport type _default from './config.default';\n";
+    "import type { DeepPartial } from '../src/config-builder/types';\nimport type { config as _default } from './config.default';\n";
 
   // Per-environment specs: optional imports + object props (= prefix → raw TS expression)
   const envs: Record<string, { imports?: string; props: Record<string, string | boolean> }> = {
@@ -148,7 +148,7 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
       },
     },
     test: {
-      imports: "import development from './config.development';\n",
+      imports: "import { development } from './config.development';\n",
       props: {
         domain: '',
         frontendUrl: '=development.frontendUrl',
@@ -174,7 +174,7 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
       .map(([k, v]) => `  ${k}: ${lit(v)},`)
       .join('\n');
     result[`./shared/config/config.${mode}.ts`] =
-      `${imports}${header}\nexport default {\n  mode: '${mode}',\n${nameEntry}${body}\n} satisfies DeepPartial<typeof _default>;\n`;
+      `${header}${imports}\nexport const ${mode} = {\n  mode: '${mode}',\n${nameEntry}${body}\n} satisfies DeepPartial<typeof _default>;\n`;
   }
 
   return result;
