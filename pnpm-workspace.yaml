@@ -1,4 +1,6 @@
 minimumReleaseAge: 1440
+overrides:
+  'esbuild@<0.28.1': '>=0.28.1'
 allowBuilds:
   '@evilmartians/lefthook': true
   esbuild: true
