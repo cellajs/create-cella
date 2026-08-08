@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.7](https://github.com/cellajs/create-cella/compare/create-cella-0.3.6...create-cella-0.3.7) (2026-08-08)
+
+
+### 🐞 Bug fixes
+
+* emit named exports in generated env configs ([#20](https://github.com/cellajs/create-cella/issues/20)) ([efb3300](https://github.com/cellajs/create-cella/commit/efb33008c86e38c6073769230e01f83e86d46920))
+
 ## [0.3.6](https://github.com/cellajs/create-cella/compare/create-cella-0.3.5...create-cella-0.3.6) (2026-08-03)
 
 
