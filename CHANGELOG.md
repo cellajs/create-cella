@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.8](https://github.com/cellajs/create-cella/compare/create-cella-0.3.7...create-cella-0.3.8) (2026-08-11)
+
+
+### 🐞 Bug fixes
+
+* emit .ts import extensions in generated env configs ([#23](https://github.com/cellajs/create-cella/issues/23)) ([86c8603](https://github.com/cellajs/create-cella/commit/86c860315df6b745f93fb3e73fd85addbff286ea))
+
 ## [0.3.7](https://github.com/cellajs/create-cella/compare/create-cella-0.3.6...create-cella-0.3.7) (2026-08-08)
 
 
