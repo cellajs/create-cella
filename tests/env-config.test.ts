@@ -76,13 +76,13 @@ describe('generateEnvConfigs', () => {
       const content = configs[`./shared/config/config.${mode}.ts`];
       expect(content).toContain(`export const ${mode} = {`);
       expect(content).not.toContain('export default');
-      expect(content).toContain("import type { config as _default } from './config.default'");
+      expect(content).toContain("import type { config as _default } from './config.default.ts'");
     }
   });
 
   it('imports DeepPartial from the config-builder module', () => {
     for (const content of Object.values(configs)) {
-      expect(content).toContain("from '../src/config-builder/types'");
+      expect(content).toContain("from '../src/config-builder/types.ts'");
       expect(content).not.toContain("from '../src/builder/types'");
     }
   });
@@ -104,7 +104,7 @@ describe('generateEnvConfigs', () => {
 
   it('derives test urls from development as raw expressions', () => {
     const test = configs['./shared/config/config.test.ts'];
-    expect(test).toContain("import { development } from './config.development'");
+    expect(test).toContain("import { development } from './config.development.ts'");
     expect(test).toContain('frontendUrl: development.frontendUrl');
     expect(test).toContain('backendUrl: development.backendUrl');
   });
