@@ -122,7 +122,7 @@ async function promptTemplateRef(theme: object, context: object): Promise<string
   if (!release && !commit) return undefined;
 
   // One-sentence intro followed by the two data points.
-  console.info(pc.dim('You are about to install the Cella template.'));
+  console.info(pc.dim('This create CLI allows you to get started with cella quickly.'));
   console.info();
 
   if (release) console.info(`  Latest release:  ${release.tag} ${pc.dim(`· ${release.date}`)}`);
@@ -147,7 +147,7 @@ async function promptTemplateRef(theme: object, context: object): Promise<string
 
   const choice = await select(
     {
-      message: 'Start from',
+      message: 'Choose where to fork cella from:',
       theme,
       choices: [
         { name: 'Latest release', value: 'release' },
