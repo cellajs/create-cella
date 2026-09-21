@@ -9,7 +9,7 @@ import { generateEnvConfigs, generateEnvFromExample, getBackendEnvReplacements }
  * These do not require a full project install (unlike e2e.test.ts).
  */
 describe('getBackendEnvReplacements', () => {
-  it('includes docker-compose vars, db urls, admin email and port', () => {
+  it('includes docker-compose vars, db urls and admin email', () => {
     const r = getBackendEnvReplacements('my-app', 'admin@my-app.example.com', 0);
 
     // backend/.env is the single source of truth for docker compose vars (no root .env)
@@ -17,19 +17,19 @@ describe('getBackendEnvReplacements', () => {
     expect(r.DB_PORT).toBe('5432');
     expect(r.DB_TEST_PORT).toBe('5434');
     expect(r.ADMIN_EMAIL).toBe('admin@my-app.example.com');
-    expect(r.PORT).toBe('4000');
     expect(r.DATABASE_URL).toContain('@0.0.0.0:5432/');
     expect(r.DATABASE_ADMIN_URL).toContain('@0.0.0.0:5432/');
     expect(r.DATABASE_CDC_URL).toContain('@0.0.0.0:5432/');
   });
 
-  it('applies the port offset to all ports and db urls', () => {
+  it('applies the port offset to db ports and never emits PORT (devPorts governs services)', () => {
     const r = getBackendEnvReplacements('my-app', 'admin@my-app.example.com', 10);
 
     expect(r.DB_PORT).toBe('5442');
     expect(r.DB_TEST_PORT).toBe('5444');
-    expect(r.PORT).toBe('4010');
     expect(r.DATABASE_URL).toContain('@0.0.0.0:5442/');
+    // A PORT= env line would silently override the config offset
+    expect(r.PORT).toBeUndefined();
   });
 });
 
@@ -93,13 +93,18 @@ describe('generateEnvConfigs', () => {
     }
   });
 
-  it('bakes project-specific values and ports into development', () => {
+  it('bakes project-specific values, same-origin urls and devPorts into development', () => {
     const dev = configs['./shared/config/config.development.ts'];
     expect(dev).toContain("mode: 'development'");
     expect(dev).toContain("name: 'My App DEVELOPMENT'");
     expect(dev).toContain("slug: 'my-app-development'");
-    expect(dev).toContain("'http://localhost:3000'");
-    expect(dev).toContain("'http://localhost:4000'");
+    // Same-origin shape: every service is a path under the frontend origin
+    expect(dev).toContain("frontendUrl: 'http://localhost:3000'");
+    expect(dev).toContain("backendUrl: 'http://localhost:3000/api'");
+    expect(dev).toContain("backendAuthUrl: 'http://localhost:3000/api/auth'");
+    expect(dev).toContain("yjsUrl: 'ws://localhost:3000/yjs'");
+    expect(dev).toContain("mcpUrl: 'http://localhost:3000/mcp'");
+    expect(dev).toContain('devPorts: { api: 4000, cdcHealth: 4001, yjs: 4002, mcp: 4003 }');
   });
 
   it('derives test urls from development as raw expressions', () => {
@@ -107,6 +112,8 @@ describe('generateEnvConfigs', () => {
     expect(test).toContain("import { development } from './config.development.ts'");
     expect(test).toContain('frontendUrl: development.frontendUrl');
     expect(test).toContain('backendUrl: development.backendUrl');
+    expect(test).toContain('yjsUrl: development.yjsUrl');
+    expect(test).toContain('mcpUrl: development.mcpUrl');
   });
 
   it('keeps production minimal with no branding', () => {
@@ -116,10 +123,11 @@ describe('generateEnvConfigs', () => {
     expect(prod).not.toContain('name:');
   });
 
-  it('applies the port offset to generated urls', () => {
+  it('applies the port offset to the frontend url and devPorts together', () => {
     const offset = generateEnvConfigs('my-app', 'My App', 10);
     const dev = offset['./shared/config/config.development.ts'];
-    expect(dev).toContain("'http://localhost:3010'");
-    expect(dev).toContain("'http://localhost:4010'");
+    expect(dev).toContain("frontendUrl: 'http://localhost:3010'");
+    expect(dev).toContain("backendUrl: 'http://localhost:3010/api'");
+    expect(dev).toContain('devPorts: { api: 4010, cdcHealth: 4011, yjs: 4012, mcp: 4013 }');
   });
 });

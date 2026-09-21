@@ -88,7 +88,10 @@ export async function generateEnvFromExample(
 /**
  * Replacement map for `backend/.env`.
  * The backend `.env` is the single source of truth for the project slug, database
- * ports (consumed by `backend/compose.yaml`), connection URLs, admin email and API port.
+ * ports (consumed by `backend/compose.yaml`), connection URLs and admin email.
+ * Service ports deliberately do NOT live here: they come from `devPorts` in
+ * `config.development.ts`, and a stale `PORT=` env line would silently override
+ * the fork's offset (the pre-devPorts collision failure mode).
  */
 export function getBackendEnvReplacements(
   slug: string,
@@ -104,7 +107,6 @@ export function getBackendEnvReplacements(
     DATABASE_ADMIN_URL: `postgres://postgres:postgres@0.0.0.0:${db}/postgres`,
     DATABASE_CDC_URL: `postgres://admin_role:dev_password@0.0.0.0:${db}/postgres`,
     ADMIN_EMAIL: adminEmail,
-    PORT: String(4000 + portOffset),
   };
 }
 
@@ -115,20 +117,26 @@ export function getBackendEnvReplacements(
  */
 export function generateEnvConfigs(slug: string, name: string, portOffset: number): Record<string, string> {
   const fe = 3000 + portOffset;
-  const be = 4000 + portOffset;
+  const api = 4000 + portOffset;
 
   const header =
     "import type { DeepPartial } from '../src/config-builder/types.ts';\nimport type { config as _default } from './config.default.ts';\n";
 
-  // Per-environment specs: optional imports + object props (= prefix → raw TS expression)
+  // Per-environment specs: optional imports + object props (= prefix → raw TS expression).
+  // URL shapes are same-origin (the Vite dev server / public origin proxies /api, /yjs
+  // and /mcp), mirroring cella's own config.<mode>.ts files. Service listen ports come
+  // from `devPorts`, offset per fork so parallel local stacks never collide on :4000.
   const envs: Record<string, { imports?: string; props: Record<string, string | boolean> }> = {
     development: {
       props: {
         slug: `${slug}-development`,
         domain: '',
         frontendUrl: `http://localhost:${fe}`,
-        backendUrl: `http://localhost:${be}`,
-        backendAuthUrl: `http://localhost:${be}/auth`,
+        backendUrl: `http://localhost:${fe}/api`,
+        backendAuthUrl: `http://localhost:${fe}/api/auth`,
+        yjsUrl: `ws://localhost:${fe}/yjs`,
+        mcpUrl: `http://localhost:${fe}/mcp`,
+        devPorts: `={ api: ${api}, cdcHealth: ${api + 1}, yjs: ${api + 2}, mcp: ${api + 3} }`,
       },
     },
     staging: {
@@ -136,15 +144,20 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
         slug: `${slug}-staging`,
         domain: `${slug}.example.com`,
         frontendUrl: `https://staging.${slug}.example.com`,
-        backendUrl: `https://api-staging.${slug}.example.com`,
-        backendAuthUrl: `https://api-staging.${slug}.example.com/auth`,
+        backendUrl: `https://staging.${slug}.example.com/api`,
+        backendAuthUrl: `https://staging.${slug}.example.com/api/auth`,
+        yjsUrl: `wss://staging.${slug}.example.com/yjs`,
+        mcpUrl: `https://staging.${slug}.example.com/mcp`,
       },
     },
     tunnel: {
       props: {
-        frontendUrl: `https://localhost:${fe}`,
-        backendUrl: `https://${slug}.ngrok.dev`,
-        backendAuthUrl: `https://${slug}.ngrok.dev/auth`,
+        slug: `${slug}-tunnel`,
+        frontendUrl: `https://${slug}.ngrok.dev`,
+        backendUrl: `https://${slug}.ngrok.dev/api`,
+        backendAuthUrl: `https://${slug}.ngrok.dev/api/auth`,
+        yjsUrl: `wss://${slug}.ngrok.dev/yjs`,
+        mcpUrl: `https://${slug}.ngrok.dev/mcp`,
       },
     },
     test: {
@@ -154,6 +167,8 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
         frontendUrl: '=development.frontendUrl',
         backendUrl: '=development.backendUrl',
         backendAuthUrl: '=development.backendAuthUrl',
+        yjsUrl: '=development.yjsUrl',
+        mcpUrl: '=development.mcpUrl',
       },
     },
     production: { props: { maintenance: false } },
