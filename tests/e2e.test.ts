@@ -173,7 +173,7 @@ describe('create-cella e2e', () => {
       const content = readFileSync(join(targetFolder, 'shared', 'config', 'config.development.ts'), 'utf-8');
       expect(content).toContain("mode: 'development'");
       expect(content).toContain("'http://localhost:3000'");
-      expect(content).toContain("'http://localhost:4000'");
+      expect(content).toContain('api: 4000');
       expect(content).not.toContain("name: 'Cella DEVELOPMENT'");
     });
 
