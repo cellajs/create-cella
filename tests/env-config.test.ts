@@ -104,7 +104,8 @@ describe('generateEnvConfigs', () => {
     expect(dev).toContain("backendAuthUrl: 'http://localhost:3000/api/auth'");
     expect(dev).toContain("yjsUrl: 'ws://localhost:3000/yjs'");
     expect(dev).toContain("mcpUrl: 'http://localhost:3000/mcp'");
-    expect(dev).toContain('devPorts: { api: 4000, cdcHealth: 4001, yjs: 4002, mcp: 4003 }');
+    expect(dev).toContain("oauthUrl: 'http://localhost:3000/oauth'");
+    expect(dev).toContain('devPorts: { api: 4000, cdcHealth: 4001, yjs: 4002, mcp: 4003, oauth: 4004 }');
   });
 
   it('derives test urls from development as raw expressions', () => {
@@ -128,6 +129,6 @@ describe('generateEnvConfigs', () => {
     const dev = offset['./shared/config/config.development.ts'];
     expect(dev).toContain("frontendUrl: 'http://localhost:3010'");
     expect(dev).toContain("backendUrl: 'http://localhost:3010/api'");
-    expect(dev).toContain('devPorts: { api: 4010, cdcHealth: 4011, yjs: 4012, mcp: 4013 }');
+    expect(dev).toContain('devPorts: { api: 4010, cdcHealth: 4011, yjs: 4012, mcp: 4013, oauth: 4014 }');
   });
 });

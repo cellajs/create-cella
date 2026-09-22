@@ -123,8 +123,8 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
     "import type { DeepPartial } from '../src/config-builder/types.ts';\nimport type { config as _default } from './config.default.ts';\n";
 
   // Per-environment specs: optional imports + object props (= prefix → raw TS expression).
-  // URL shapes are same-origin (the Vite dev server / public origin proxies /api, /yjs
-  // and /mcp), mirroring cella's own config.<mode>.ts files. Service listen ports come
+  // URL shapes are same-origin (the Vite dev server / public origin proxies /api, /yjs,
+  // /mcp and /oauth), mirroring cella's own config.<mode>.ts files. Service listen ports come
   // from `devPorts`, offset per fork so parallel local stacks never collide on :4000.
   const envs: Record<string, { imports?: string; props: Record<string, string | boolean> }> = {
     development: {
@@ -136,7 +136,8 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
         backendAuthUrl: `http://localhost:${fe}/api/auth`,
         yjsUrl: `ws://localhost:${fe}/yjs`,
         mcpUrl: `http://localhost:${fe}/mcp`,
-        devPorts: `={ api: ${api}, cdcHealth: ${api + 1}, yjs: ${api + 2}, mcp: ${api + 3} }`,
+        oauthUrl: `http://localhost:${fe}/oauth`,
+        devPorts: `={ api: ${api}, cdcHealth: ${api + 1}, yjs: ${api + 2}, mcp: ${api + 3}, oauth: ${api + 4} }`,
       },
     },
     staging: {
@@ -148,6 +149,7 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
         backendAuthUrl: `https://staging.${slug}.example.com/api/auth`,
         yjsUrl: `wss://staging.${slug}.example.com/yjs`,
         mcpUrl: `https://staging.${slug}.example.com/mcp`,
+        oauthUrl: `https://staging.${slug}.example.com/oauth`,
       },
     },
     tunnel: {
@@ -158,6 +160,7 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
         backendAuthUrl: `https://${slug}.ngrok.dev/api/auth`,
         yjsUrl: `wss://${slug}.ngrok.dev/yjs`,
         mcpUrl: `https://${slug}.ngrok.dev/mcp`,
+        oauthUrl: `https://${slug}.ngrok.dev/oauth`,
       },
     },
     test: {
@@ -169,6 +172,7 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
         backendAuthUrl: '=development.backendAuthUrl',
         yjsUrl: '=development.yjsUrl',
         mcpUrl: '=development.mcpUrl',
+        oauthUrl: '=development.oauthUrl',
       },
     },
     production: { props: { maintenance: false } },
