@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.8](https://github.com/cellajs/create-cella/compare/create-cella-0.3.7...create-cella-0.3.8) (2026-09-23)
+
+
+### 🎉 New features
+
+* generate oauthUrl and devPorts.oauth per mode ([#27](https://github.com/cellajs/create-cella/issues/27)) ([4b2105f](https://github.com/cellajs/create-cella/commit/4b2105f21f7af213d378f04693e548fc933a3207))
+* generate same-origin configs with offset devPorts, fix fork detection ([#25](https://github.com/cellajs/create-cella/issues/25)) ([940724b](https://github.com/cellajs/create-cella/commit/940724bd938ed3590c0b4178f2108799777fea25))
+* require Node.js 26 ([#26](https://github.com/cellajs/create-cella/issues/26)) ([e50cb92](https://github.com/cellajs/create-cella/commit/e50cb92b9021af0f937bcff80ad9eb57e05441c5))
+
+
+### 🐞 Bug fixes
+
+* emit .ts import extensions in generated env configs ([#23](https://github.com/cellajs/create-cella/issues/23)) ([86c8603](https://github.com/cellajs/create-cella/commit/86c860315df6b745f93fb3e73fd85addbff286ea))
+
 ## [0.3.7](https://github.com/cellajs/create-cella/compare/create-cella-0.3.6...create-cella-0.3.7) (2026-08-08)
 
 
