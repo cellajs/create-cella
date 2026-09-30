@@ -118,6 +118,21 @@ export function getBackendEnvReplacements(
 export function generateEnvConfigs(slug: string, name: string, portOffset: number): Record<string, string> {
   const fe = 3000 + portOffset;
   const api = 4000 + portOffset;
+  // Every devPorts key, offset as one block: a key left out keeps its default port and
+  // collides with another local stack (the config merge keeps unlisted keys).
+  const devPorts = {
+    frontend: fe,
+    api,
+    cdcHealth: api + 1,
+    yjs: api + 2,
+    mcp: api + 3,
+    oauth: api + 4,
+    internal: api + 5,
+    jobs: api + 6,
+  };
+  const devPortsExpression = Object.entries(devPorts)
+    .map(([key, port]) => `${key}: ${port}`)
+    .join(', ');
 
   const header =
     "import type { DeepPartial } from '../src/config-builder/types.ts';\nimport type { config as _default } from './config.default.ts';\n";
@@ -137,7 +152,7 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
         yjsUrl: `ws://localhost:${fe}/yjs`,
         mcpUrl: `http://localhost:${fe}/mcp`,
         oauthUrl: `http://localhost:${fe}/oauth`,
-        devPorts: `={ api: ${api}, cdcHealth: ${api + 1}, yjs: ${api + 2}, mcp: ${api + 3}, oauth: ${api + 4} }`,
+        devPorts: `={ ${devPortsExpression} }`,
       },
     },
     staging: {

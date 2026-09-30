@@ -34,7 +34,7 @@ export async function detectUsedPorts(targetFolder: string): Promise<UsedPorts[]
       const frontend = Number(feMatch[1]);
       // Same-origin shape: service ports live in devPorts. Legacy shape: backendUrl
       // has its own port. Oldest forks predate both; assume the paired offset then.
-      const devPortsMatch = content.match(/devPorts:\s*\{\s*api:\s*(\d+)/);
+      const devPortsMatch = content.match(/devPorts:\s*\{[^}]*?\bapi:\s*(\d+)/);
       const legacyBeMatch = content.match(/backendUrl:\s*'http:\/\/localhost:(\d+)'/);
       const backend = devPortsMatch
         ? Number(devPortsMatch[1])
