@@ -23,7 +23,13 @@ describe('detectUsedPorts', () => {
     writeFork(
       parent,
       'fork-devports',
-      "export const development = {\n  frontendUrl: 'http://localhost:3020',\n  backendUrl: 'http://localhost:3020/api',\n  devPorts: { api: 4020, cdcHealth: 4021, yjs: 4022, mcp: 4023 },\n};\n",
+      "export const development = {\n  frontendUrl: 'http://localhost:3020',\n  backendUrl: 'http://localhost:3020/api',\n  devPorts: { frontend: 3020, api: 4020, cdcHealth: 4021, yjs: 4022, mcp: 4023, oauth: 4024, internal: 4025, jobs: 4026 },\n};\n",
+    );
+    // devPorts with api after another key and off the paired offset: the block is read, not the fallback
+    writeFork(
+      parent,
+      'fork-devports-custom',
+      "export const development = {\n  frontendUrl: 'http://localhost:3050',\n  devPorts: { frontend: 3050, api: 4150 },\n};\n",
     );
     // Legacy shape: backendUrl on its own port
     writeFork(
@@ -50,6 +56,7 @@ describe('detectUsedPorts', () => {
     const byProject = Object.fromEntries(used.map((u) => [u.project, u]));
 
     expect(byProject['fork-devports']).toMatchObject({ frontend: 3020, backend: 4020, offset: 20 });
+    expect(byProject['fork-devports-custom']).toMatchObject({ frontend: 3050, backend: 4150, offset: 50 });
     expect(byProject['fork-legacy']).toMatchObject({ frontend: 3010, backend: 4010, offset: 10 });
     // No devPorts and no port in backendUrl: assume the paired service offset
     expect(byProject['fork-sameorigin-bare']).toMatchObject({ frontend: 3030, backend: 4030, offset: 30 });
