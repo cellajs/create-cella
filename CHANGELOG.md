@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.9](https://github.com/cellajs/create-cella/compare/create-cella-0.3.8...create-cella-0.3.9) (2026-10-01)
+
+
+### 🐞 Bug fixes
+
+* offset every devPorts key, including internal and jobs ([#28](https://github.com/cellajs/create-cella/issues/28)) ([e086bb3](https://github.com/cellajs/create-cella/commit/e086bb386435a2a26983131c0ed031b704aa0a67))
+
 ## [0.3.8](https://github.com/cellajs/create-cella/compare/create-cella-0.3.7...create-cella-0.3.8) (2026-09-23)
 
 
