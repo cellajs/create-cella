@@ -85,12 +85,16 @@ describe('release smoke', () => {
     expect(backendEnv).toContain('DB_TEST_PORT=5444');
     expect(backendEnv).toContain('DATABASE_URL=postgres://runtime_role:dev_password@0.0.0.0:5442/postgres');
     expect(backendEnv).toContain('ADMIN_EMAIL=admin@smoke-app.com');
-    expect(backendEnv).toContain('PORT=4010');
+    // Service ports come from devPorts; a PORT= line would override the offset.
+    expect(backendEnv).not.toMatch(/^PORT=/m);
 
     expect(developmentConfig).toContain("slug: 'smoke-app-development'");
     expect(developmentConfig).toContain("frontendUrl: 'http://localhost:3010'");
-    expect(developmentConfig).toContain("backendUrl: 'http://localhost:4010'");
-    expect(developmentConfig).toContain("backendAuthUrl: 'http://localhost:4010/auth'");
+    expect(developmentConfig).toContain("backendUrl: 'http://localhost:3010/api'");
+    expect(developmentConfig).toContain("backendAuthUrl: 'http://localhost:3010/api/auth'");
+    expect(developmentConfig).toContain(
+      'devPorts: { frontend: 3010, api: 4010, cdcHealth: 4011, yjs: 4012, mcp: 4013, oauth: 4014, internal: 4015, jobs: 4016 }',
+    );
 
     // Git steps run for real now — assert the repo was initialized, the root commit carries
     // the `Cella-Base:` provenance trailer the sync CLI bootstraps its first merge-base from,
