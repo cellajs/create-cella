@@ -1,0 +1,272 @@
+name: Create flow
+
+# The newcomer path on a new app, one step per line of the app's README (cella/QUICKSTART.md): create, install,
+# generate, docker, seed, dev, then a signed-in page smoke. Nothing else runs this scaffolder's output that far:
+# tests/e2e.test.ts and tests/release-smoke.test.ts scaffold an app and read its files, and cella's own CI never
+# sees a scaffolded app at all. The config files this package writes from its own string templates replace cella's
+# wholesale, so a change to their shape breaks `pnpm generate` or the first `pnpm dev` of a new app while both
+# repos stay green (three times in 2026-08). Three legs:
+#   published        the published scaffolder with cella's latest release: what `pnpm create @cellajs/cella` gives today
+#   published-main   the published scaffolder with cella main: the "Latest commit" choice in its prompt
+#   heads            this checkout with the cella clone, so a create-cella PR or a cella branch can be tried
+# Checks cella runs on itself every day (pnpm check, pnpm test, pnpm build) are left out on purpose.
+# The smoke driver lives in cella (cella/skills/verify/smoke-driver.mjs) and is run from the clone, never from the
+# created app: the published leg builds its app at a release that may not carry the driver yet. Reproduce a leg
+# locally by following the README in a new app and running that driver from it.
+# A PR that changes this workflow runs all legs, since a dispatch needs the file on main.
+
+on:
+  schedule:
+    - cron: '47 4 * * *'
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/create-flow.yml
+  workflow_dispatch:
+    inputs:
+      leg:
+        description: 'Leg to run'
+        required: false
+        default: all
+        type: choice
+        options: [all, published, published-main, heads]
+      cella-ref:
+        description: 'cella branch or tag: the template for the heads leg, and the smoke driver for every leg'
+        required: false
+        default: main
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: create-flow
+  cancel-in-progress: false
+
+env:
+  ADMIN_EMAIL: admin@my-app.example.com
+  TEMPLATE_REPO: https://github.com/cellajs/cella.git
+  CELLA_REF: ${{ inputs.cella-ref || 'main' }}
+
+jobs:
+  create:
+    name: ${{ matrix.leg }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: ${{ fromJSON((inputs.leg == '' || inputs.leg == 'all') && '["published", "published-main", "heads"]' || format('["{0}"]', inputs.leg)) }}
+    env:
+      LEG: ${{ matrix.leg }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 26
+          cache: "pnpm"
+
+      # One clone serves two purposes: the smoke driver for every leg, and the template the heads leg scaffolds from.
+      - name: Clone cella
+        run: |
+          set -euo pipefail
+          git clone --quiet --depth 1 --branch "$CELLA_REF" "$TEMPLATE_REPO" "$RUNNER_TEMP/cella"
+          {
+            echo "CELLA_DIR=$RUNNER_TEMP/cella"
+            echo "APP_DIR=$RUNNER_TEMP/my-app"
+          } >> "$GITHUB_ENV"
+          echo "cella $CELLA_REF = $(git -C "$RUNNER_TEMP/cella" rev-parse HEAD)"
+
+      # The scaffolder's release lookup is an unauthenticated GitHub API call that falls back to main when it fails, so the
+      # commit the app is based on is checked against these. Main is read again after the create, in case it moved meanwhile.
+      - name: Note the upstream refs
+        id: refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=$(gh api repos/cellajs/cella/releases/latest --jq .tag_name)
+          tag_sha=$(git ls-remote "$TEMPLATE_REPO" "refs/tags/$tag" "refs/tags/$tag^{}" | tail -1 | cut -f1)
+          main_sha=$(git ls-remote "$TEMPLATE_REPO" refs/heads/main | cut -f1)
+          if [ "$LEG" = heads ]; then scaffolder="this checkout"; else scaffolder="@cellajs/create-cella $(npm view @cellajs/create-cella version)"; fi
+          echo "latest release $tag = $tag_sha, main = $main_sha, scaffolder = $scaffolder"
+          {
+            echo "tag=$tag"
+            echo "tag_sha=$tag_sha"
+            echo "main_sha=$main_sha"
+            echo "scaffolder=$scaffolder"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build this checkout
+        if: matrix.leg == 'heads'
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      # Without a TTY the published scaffolder takes the latest release and skips the optional-modules prompt; the directory,
+      # port offset and admin email are passed so no other prompt is reached.
+      - name: Create the app
+        id: create
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          case "$LEG" in
+            published)
+              pnpm create @cellajs/cella my-app --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
+            published-main)
+              pnpm create @cellajs/cella my-app --template github:cellajs/cella --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
+            heads)
+              node "$GITHUB_WORKSPACE/index.js" my-app --template "$CELLA_DIR" --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
+          esac
+
+      - name: The app carries the template with the placeholders filled and the upstream remote
+        id: verify
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          TAG: ${{ steps.refs.outputs.tag }}
+          TAG_SHA: ${{ steps.refs.outputs.tag_sha }}
+          MAIN_SHA: ${{ steps.refs.outputs.main_sha }}
+        run: |
+          set -euo pipefail
+          for dir in backend frontend shared locales; do test -d "$dir"; done
+          test ! -e shared/config/config.template.ts
+          if grep -rq '__project_' shared/config; then echo '::error::placeholders left in shared/config'; exit 1; fi
+          grep -q "slug: 'my-app'" shared/config/config.default.ts
+          grep -q '^PROJECT_SLUG=my-app$' backend/.env
+          grep -q "^ADMIN_EMAIL=$ADMIN_EMAIL$" backend/.env
+          test -f frontend/.env
+          git remote get-url cella-upstream | grep -q 'cellajs/cella'
+          base=$(git log -1 --format=%B | sed -n 's/^Cella-Base: //p')
+          case "$LEG" in
+            published)
+              if [ "$base" != "$TAG_SHA" ]; then
+                echo "::error::the app is based on ${base:-no recorded commit}; the latest release $TAG is $TAG_SHA. Did the release lookup fall back to main?"
+                exit 1
+              fi ;;
+            published-main)
+              main_now=$(git ls-remote "$TEMPLATE_REPO" refs/heads/main | cut -f1)
+              if [ "$base" != "$MAIN_SHA" ] && [ "$base" != "$main_now" ]; then
+                echo "::error::the app is based on ${base:-no recorded commit}; main was $MAIN_SHA before the create and $main_now after it"
+                exit 1
+              fi ;;
+            heads)
+              # A local template leaves no Cella-Base trailer today
+              base="$(git -C "$CELLA_DIR" rev-parse HEAD) (cella $CELLA_REF)" ;;
+          esac
+          echo "template commit: $base"
+
+      - name: pnpm install
+        id: install
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          pnpm install
+          git diff --exit-code --stat -- pnpm-lock.yaml
+
+      - name: pnpm generate
+        id: generate
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          pnpm generate
+          find backend/drizzle -name '*.sql' | grep -q . || { echo '::error::pnpm generate wrote no migration'; exit 1; }
+
+      - name: pnpm docker
+        id: docker
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          pnpm docker
+          start=$SECONDS
+          until docker exec my-app_db pg_isready -U postgres >/dev/null 2>&1; do
+            if [ $((SECONDS - start)) -ge 90 ]; then
+              echo '::error::the database did not accept connections within 90 s'
+              docker logs my-app_db 2>&1 | tail -50
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "db_ready_seconds=$((SECONDS - start))" >> "$GITHUB_OUTPUT"
+          echo "postgres accepted connections after $((SECONDS - start)) s"
+
+      - name: pnpm seed
+        id: seed
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          pnpm seed 2>&1 | tee "$RUNNER_TEMP/seed.log"
+          grep -q 'Migrations applied' "$RUNNER_TEMP/seed.log"
+          grep -q 'Seed finished' "$RUNNER_TEMP/seed.log"
+
+      - name: Install Playwright browser
+        working-directory: ${{ env.APP_DIR }}
+        run: pnpm --filter frontend exec playwright install --with-deps chromium
+
+      - name: pnpm dev, then the signed-in smoke
+        id: smoke
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          OUT_DIR: ${{ runner.temp }}/smoke
+        run: node "$CELLA_DIR/cella/skills/verify/smoke-driver.mjs"
+
+      # cella's `pnpm template:check` covers the config the template itself carries, on every cella PR. This covers
+      # the files this package writes from its own string templates, which that check never sees, and their formatting.
+      - name: The generated config typechecks and is formatted
+        id: config
+        if: always() && steps.install.outcome == 'success'
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          pnpm --filter shared ts
+          pnpm biome check shared/config
+
+      - name: Upload the stack log, screenshots and evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: create-flow-${{ matrix.leg }}
+          path: |
+            ${{ runner.temp }}/smoke
+            ${{ runner.temp }}/seed.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Summary
+        if: always()
+        env:
+          SCAFFOLDER: ${{ steps.refs.outputs.scaffolder }}
+          TAG: ${{ steps.refs.outputs.tag }}
+          DB_READY: ${{ steps.docker.outputs.db_ready_seconds }}
+          O_CREATE: ${{ steps.create.outcome }}
+          O_VERIFY: ${{ steps.verify.outcome }}
+          O_INSTALL: ${{ steps.install.outcome }}
+          O_GENERATE: ${{ steps.generate.outcome }}
+          O_DOCKER: ${{ steps.docker.outcome }}
+          O_SEED: ${{ steps.seed.outcome }}
+          O_SMOKE: ${{ steps.smoke.outcome }}
+          O_CONFIG: ${{ steps.config.outcome }}
+        run: |
+          {
+            echo "### $LEG"
+            echo ""
+            echo "Scaffolder: $SCAFFOLDER. Template: cella $CELLA_REF. Latest release: $TAG. Postgres ready after: ${DB_READY:-n/a} s."
+            echo ""
+            echo "| README step | Result |"
+            echo "| --- | --- |"
+            echo "| pnpm create @cellajs/cella | $O_CREATE |"
+            echo "| template, placeholders, upstream remote | $O_VERIFY |"
+            echo "| pnpm install | $O_INSTALL |"
+            echo "| pnpm generate | $O_GENERATE |"
+            echo "| pnpm docker | $O_DOCKER |"
+            echo "| pnpm seed | $O_SEED |"
+            echo "| pnpm dev + signed-in smoke | $O_SMOKE |"
+            echo "| generated config typechecks and is formatted | $O_CONFIG |"
+          } >> "$GITHUB_STEP_SUMMARY"
