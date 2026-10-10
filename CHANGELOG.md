@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.10](https://github.com/cellajs/create-cella/compare/create-cella-0.3.9...create-cella-0.3.10) (2026-10-10)
+
+
+### 🔧 Small improvements
+
+* stop seeding the cella migrations applied-set ([#32](https://github.com/cellajs/create-cella/issues/32)) ([c977b0d](https://github.com/cellajs/create-cella/commit/c977b0d7225b8d449e45704e0e1e1ffcd0368e26))
+
 ## [0.3.9](https://github.com/cellajs/create-cella/compare/create-cella-0.3.8...create-cella-0.3.9) (2026-10-01)
 
 
