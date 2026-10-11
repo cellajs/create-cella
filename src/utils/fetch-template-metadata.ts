@@ -1,11 +1,15 @@
 /**
- * Fetch lightweight metadata about the cella template from the GitHub API so the
- * scaffolder can offer "latest release" vs "latest commit" as a starting point.
+ * Fetch lightweight metadata about the cella template so the scaffolder can offer
+ * "latest release" vs "latest commit" as a starting point.
  *
- * Both helpers fail soft (return null) on network/API errors or rate limits — the
- * caller falls back to the default branch when metadata is unavailable.
+ * The release tag is read from the template's git tags, over the transport the clone uses, so
+ * it does not depend on the GitHub API and its limit for callers without a token. Dates and the
+ * commit subject come from that API. Every helper fails soft; the caller falls back to the
+ * default branch when no release is known.
  */
-import { TEMPLATE_REPOSITORY } from '#/constants';
+import git from 'isomorphic-git';
+import http from 'isomorphic-git/http/node';
+import { TEMPLATE_GIT_URL, TEMPLATE_REPOSITORY } from '#/constants';
 
 const TEMPLATE_METADATA_API_BASE = `https://api.github.com/repos/${TEMPLATE_REPOSITORY}`;
 
@@ -17,10 +21,10 @@ function toDate(iso?: string): string {
 const GITHUB_HEADERS = { Accept: 'application/vnd.github+json' } as const;
 
 export interface ReleaseInfo {
-  /** Release tag, e.g. 'v0.5.0' */
+  /** Release tag, e.g. '0.18.1' */
   tag: string;
-  /** Publication date, YYYY-MM-DD */
-  date: string;
+  /** Publication date, YYYY-MM-DD; absent when the GitHub API did not answer */
+  date?: string;
 }
 
 export interface CommitInfo {
@@ -35,32 +39,53 @@ export interface CommitInfo {
 }
 
 /**
- * Fetch the latest published template release (`v*` tag).
- *
- * cella publishes two release series — the template (`v*`) and the scaffolder
- * (`create-cella-v*`). We list releases (newest first) and pick the first
- * non-draft, non-prerelease `v*` release so the scaffolder version is ignored.
+ * Pick the latest template release from tag names: the highest plain version, with or without
+ * the `v` prefix. Tags of another series (`create-cella-0.2.3`, `archive/pre-release`) and
+ * pre-releases are no template release.
  */
+export function pickLatestReleaseTag(tags: string[]): string | null {
+  let latest: { tag: string; version: number[] } | null = null;
+  for (const tag of tags) {
+    const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(tag);
+    if (!match) continue;
+    const version = match.slice(1).map(Number);
+    if (!latest || isNewer(version, latest.version)) latest = { tag, version };
+  }
+  return latest?.tag ?? null;
+}
+
+/** Whether version `a` is higher than `b`, both as [major, minor, patch]. */
+function isNewer(a: number[], b: number[]): boolean {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i];
+  }
+  return false;
+}
+
+/** Fetch the latest template release: its tag from the git tags, its date from the GitHub API. */
 export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
-  const apiUrl = `${TEMPLATE_METADATA_API_BASE}/releases?per_page=30`;
-
+  let tag: string | null;
   try {
-    const response = await fetch(apiUrl, { headers: GITHUB_HEADERS });
-    if (!response.ok) return null;
-
-    const releases = (await response.json()) as Array<{
-      tag_name?: string;
-      published_at?: string;
-      draft?: boolean;
-      prerelease?: boolean;
-    }>;
-
-    const release = releases.find((r) => !r.draft && !r.prerelease && /^v?\d/.test(r.tag_name ?? ''));
-    if (!release?.tag_name) return null;
-
-    return { tag: release.tag_name, date: toDate(release.published_at) };
+    const refs = await git.listServerRefs({ http, url: TEMPLATE_GIT_URL, prefix: 'refs/tags/' });
+    tag = pickLatestReleaseTag(refs.map(({ ref }) => ref.slice('refs/tags/'.length)));
   } catch {
     return null;
+  }
+  if (!tag) return null;
+
+  return { tag, date: await fetchReleaseDate(tag) };
+}
+
+/** Publication date of a release, undefined when the GitHub API does not answer. */
+async function fetchReleaseDate(tag: string): Promise<string | undefined> {
+  try {
+    const response = await fetch(`${TEMPLATE_METADATA_API_BASE}/releases/tags/${tag}`, { headers: GITHUB_HEADERS });
+    if (!response.ok) return undefined;
+
+    const release = (await response.json()) as { published_at?: string };
+    return release.published_at ? toDate(release.published_at) : undefined;
+  } catch {
+    return undefined;
   }
 }
 

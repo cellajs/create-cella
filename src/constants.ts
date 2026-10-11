@@ -13,6 +13,12 @@ export const TEMPLATE_URL = 'github:cellajs/cella';
 /** Canonical owner/repo for template metadata fetched from the GitHub API. */
 export const TEMPLATE_REPOSITORY = 'cellajs/cella';
 
+/** HTTPS git URL of the template, for reading its release tags without the GitHub API. */
+export const TEMPLATE_GIT_URL = `https://github.com/${TEMPLATE_REPOSITORY}.git`;
+
+/** The app's sync config, which the template ships with its own settings. */
+export const SYNC_CONFIG = 'cella/cella.config.ts';
+
 /** URL to the repository */
 export const CELLA_REMOTE_URL = 'git@github.com:cellajs/cella.git';
 
@@ -153,6 +159,9 @@ export function generateEnvConfigs(slug: string, name: string, portOffset: numbe
         mcpUrl: `http://localhost:${fe}/mcp`,
         oauthUrl: `http://localhost:${fe}/oauth`,
         devPorts: `={ ${devPortsExpression} }`,
+        // The template's shared development buckets hold the seed files and the GeoIP databases,
+        // so seeded attachments render before the app has storage of its own.
+        s3: "={ region: 'nl-ams', host: 's3.nl-ams.scw.cloud', publicBucket: 'cella-shared-public', privateBucket: 'cella-shared-private' }",
       },
     },
     staging: {
