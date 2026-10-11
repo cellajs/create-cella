@@ -84,8 +84,8 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "cella $CELLA_REF = $(git -C "$RUNNER_TEMP/cella" rev-parse HEAD)"
 
-      # The scaffolder's release lookup is an unauthenticated GitHub API call that falls back to main when it fails, so the
-      # commit the app is based on is checked against these. Main is read again after the create, in case it moved meanwhile.
+      # The scaffolder falls back to main when it finds no release, so the commit the app is based on is checked against
+      # these. Main is read again after the create, in case it moved meanwhile.
       - name: Note the upstream refs
         id: refs
         env:
@@ -192,11 +192,15 @@ jobs:
           pnpm generate
           find backend/drizzle -name '*.sql' | grep -q . || { echo '::error::pnpm generate wrote no migration'; exit 1; }
 
-      # No wait of its own: the README's next line is the seed, so `pnpm docker` has to return a database that accepts connections.
+      # One probe and no retry: the README's next line is the seed, so the database has to accept connections the moment
+      # `pnpm docker` returns. Separate steps start the seed late enough to hide a `pnpm docker` that returns too early.
       - name: pnpm docker
         id: docker
         working-directory: ${{ env.APP_DIR }}
-        run: pnpm docker
+        run: |
+          set -euo pipefail
+          pnpm docker
+          docker exec my-app_db pg_isready -U postgres -h 127.0.0.1
 
       - name: pnpm seed
         id: seed
