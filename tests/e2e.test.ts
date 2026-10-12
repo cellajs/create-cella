@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import git from 'isomorphic-git';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { create } from '#/create';
+import { fetchLatestRelease } from '#/utils/fetch-template-metadata';
 
 /**
  * E2E test for create-cella CLI.
@@ -130,6 +131,22 @@ describe('create-cella e2e', () => {
     });
   });
 
+  describe('sync config', () => {
+    it('should not carry the forks the template itself syncs to', () => {
+      const content = readFileSync(join(targetFolder, 'cella', 'cella.config.ts'), 'utf-8');
+      expect(content).toContain('upstreamUrl');
+      expect(content).not.toContain('forks:');
+      expect(content).not.toContain('raak');
+    });
+  });
+
+  describe('latest release', () => {
+    it('should read a version tag from the template without the GitHub API', async () => {
+      const release = await fetchLatestRelease();
+      expect(release?.tag).toMatch(/^v?\d+\.\d+\.\d+$/);
+    });
+  });
+
   describe('placeholder config', () => {
     it('should have interpolated default-config.ts without __tokens__', () => {
       const configPath = join(targetFolder, 'shared', 'config', 'config.default.ts');
@@ -162,6 +179,7 @@ describe('create-cella e2e', () => {
       expect(content).toContain("mode: 'development'");
       expect(content).toContain("'http://localhost:3000'");
       expect(content).toContain('api: 4000');
+      expect(content).toContain("publicBucket: 'cella-shared-public'");
       expect(content).not.toContain("name: 'Cella DEVELOPMENT'");
     });
 

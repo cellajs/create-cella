@@ -95,6 +95,10 @@ describe('release smoke', () => {
     expect(developmentConfig).toContain(
       'devPorts: { frontend: 3010, api: 4010, cdcHealth: 4011, yjs: 4012, mcp: 4013, oauth: 4014, internal: 4015, jobs: 4016 }',
     );
+    expect(developmentConfig).toContain("publicBucket: 'cella-shared-public'");
+
+    // The template's own list of downstream repos is gone from the app's sync config
+    expect(readFileSync(join(targetFolder, 'cella', 'cella.config.ts'), 'utf8')).not.toContain('forks:');
 
     // Git steps run for real now — assert the repo was initialized, the root commit carries
     // the `Cella-Base:` provenance trailer the sync CLI bootstraps its first merge-base from,

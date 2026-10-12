@@ -84,8 +84,8 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "cella $CELLA_REF = $(git -C "$RUNNER_TEMP/cella" rev-parse HEAD)"
 
-      # The scaffolder's release lookup is an unauthenticated GitHub API call that falls back to main when it fails, so the
-      # commit the app is based on is checked against these. Main is read again after the create, in case it moved meanwhile.
+      # The scaffolder falls back to main when it finds no release, so the commit the app is based on is checked against
+      # these. Main is read again after the create, in case it moved meanwhile.
       - name: Note the upstream refs
         id: refs
         env:
@@ -95,13 +95,15 @@ jobs:
           tag=$(gh api repos/cellajs/cella/releases/latest --jq .tag_name)
           tag_sha=$(git ls-remote "$TEMPLATE_REPO" "refs/tags/$tag" "refs/tags/$tag^{}" | tail -1 | cut -f1)
           main_sha=$(git ls-remote "$TEMPLATE_REPO" refs/heads/main | cut -f1)
-          if [ "$LEG" = heads ]; then scaffolder="this checkout"; else scaffolder="@cellajs/create-cella $(npm view @cellajs/create-cella version)"; fi
-          echo "latest release $tag = $tag_sha, main = $main_sha, scaffolder = $scaffolder"
+          npm_latest=$(npm view @cellajs/create-cella version)
+          npm_published=$(npm view @cellajs/create-cella time --json | jq -r --arg v "$npm_latest" '.[$v]')
+          echo "latest release $tag = $tag_sha, main = $main_sha, npm's latest scaffolder = $npm_latest ($npm_published)"
           {
             echo "tag=$tag"
             echo "tag_sha=$tag_sha"
             echo "main_sha=$main_sha"
-            echo "scaffolder=$scaffolder"
+            echo "npm_latest=$npm_latest"
+            echo "npm_published=$npm_published"
           } >> "$GITHUB_OUTPUT"
 
       - name: Build this checkout
@@ -113,9 +115,14 @@ jobs:
 
       # Without a TTY the published scaffolder takes the latest release and skips the optional-modules prompt; the directory,
       # port offset and admin email are passed so no other prompt is reached.
+      # pnpm serves a new version of a package a day after its publish, so the published legs can run the version before
+      # npm's latest. The scaffolder's banner names the version that ran.
       - name: Create the app
         id: create
         working-directory: ${{ runner.temp }}
+        env:
+          NPM_LATEST: ${{ steps.refs.outputs.npm_latest }}
+          NPM_PUBLISHED: ${{ steps.refs.outputs.npm_published }}
         run: |
           set -euo pipefail
           case "$LEG" in
@@ -125,7 +132,12 @@ jobs:
               pnpm create @cellajs/cella my-app --template github:cellajs/cella --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
             heads)
               node "$GITHUB_WORKSPACE/index.js" my-app --template "$CELLA_DIR" --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
-          esac
+          esac 2>&1 | tee "$RUNNER_TEMP/create.log"
+          ran=$(sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/create.log" | sed -n 's/.*create cella [^0-9]*\([0-9][0-9A-Za-z.-]*\).*/\1/p' | head -1)
+          echo "ran=${ran:-unknown}" >> "$GITHUB_OUTPUT"
+          if [ "$LEG" != heads ] && [ "$ran" != "$NPM_LATEST" ]; then
+            echo "::warning::pnpm ran create-cella ${ran:-unknown} while npm's latest is $NPM_LATEST, published $NPM_PUBLISHED. pnpm serves a new version a day after its publish."
+          fi
 
       - name: The app carries the template with the placeholders filled and the upstream remote
         id: verify
@@ -144,6 +156,7 @@ jobs:
           grep -q "^ADMIN_EMAIL=$ADMIN_EMAIL$" backend/.env
           test -f frontend/.env
           git remote get-url cella-upstream | grep -q 'cellajs/cella'
+          if grep -q 'forks:' cella/cella.config.ts; then echo "::error::cella/cella.config.ts lists the template's own forks"; exit 1; fi
           base=$(git log -1 --format=%B | sed -n 's/^Cella-Base: //p')
           case "$LEG" in
             published)
@@ -179,23 +192,15 @@ jobs:
           pnpm generate
           find backend/drizzle -name '*.sql' | grep -q . || { echo '::error::pnpm generate wrote no migration'; exit 1; }
 
+      # One probe and no retry: the README's next line is the seed, so the database has to accept connections the moment
+      # `pnpm docker` returns. Separate steps start the seed late enough to hide a `pnpm docker` that returns too early.
       - name: pnpm docker
         id: docker
         working-directory: ${{ env.APP_DIR }}
         run: |
           set -euo pipefail
           pnpm docker
-          start=$SECONDS
-          until docker exec my-app_db pg_isready -U postgres >/dev/null 2>&1; do
-            if [ $((SECONDS - start)) -ge 90 ]; then
-              echo '::error::the database did not accept connections within 90 s'
-              docker logs my-app_db 2>&1 | tail -50
-              exit 1
-            fi
-            sleep 1
-          done
-          echo "db_ready_seconds=$((SECONDS - start))" >> "$GITHUB_OUTPUT"
-          echo "postgres accepted connections after $((SECONDS - start)) s"
+          docker exec my-app_db pg_isready -U postgres -h 127.0.0.1
 
       - name: pnpm seed
         id: seed
@@ -205,6 +210,10 @@ jobs:
           pnpm seed 2>&1 | tee "$RUNNER_TEMP/seed.log"
           grep -q 'Migrations applied' "$RUNNER_TEMP/seed.log"
           grep -q 'Seed finished' "$RUNNER_TEMP/seed.log"
+          if grep -q 'Seed assets not reachable' "$RUNNER_TEMP/seed.log"; then
+            echo '::error::the seeded attachments point at files the app cannot reach, so they do not render'
+            exit 1
+          fi
 
       - name: Install Playwright browser
         working-directory: ${{ env.APP_DIR }}
@@ -235,6 +244,7 @@ jobs:
           name: create-flow-${{ matrix.leg }}
           path: |
             ${{ runner.temp }}/smoke
+            ${{ runner.temp }}/create.log
             ${{ runner.temp }}/seed.log
           if-no-files-found: ignore
           retention-days: 14
@@ -242,9 +252,10 @@ jobs:
       - name: Summary
         if: always()
         env:
-          SCAFFOLDER: ${{ steps.refs.outputs.scaffolder }}
+          RAN: ${{ steps.create.outputs.ran }}
+          NPM_LATEST: ${{ steps.refs.outputs.npm_latest }}
+          NPM_PUBLISHED: ${{ steps.refs.outputs.npm_published }}
           TAG: ${{ steps.refs.outputs.tag }}
-          DB_READY: ${{ steps.docker.outputs.db_ready_seconds }}
           O_CREATE: ${{ steps.create.outcome }}
           O_VERIFY: ${{ steps.verify.outcome }}
           O_INSTALL: ${{ steps.install.outcome }}
@@ -254,10 +265,15 @@ jobs:
           O_SMOKE: ${{ steps.smoke.outcome }}
           O_CONFIG: ${{ steps.config.outcome }}
         run: |
+          if [ "$LEG" = heads ]; then
+            scaffolder="this checkout (${RAN:-did not run})"
+          else
+            scaffolder="ran ${RAN:-nothing}, npm's latest is $NPM_LATEST, published $NPM_PUBLISHED"
+          fi
           {
             echo "### $LEG"
             echo ""
-            echo "Scaffolder: $SCAFFOLDER. Template: cella $CELLA_REF. Latest release: $TAG. Postgres ready after: ${DB_READY:-n/a} s."
+            echo "Scaffolder: $scaffolder. Template: cella $CELLA_REF. Latest release: $TAG."
             echo ""
             echo "| README step | Result |"
             echo "| --- | --- |"

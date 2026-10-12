@@ -118,29 +118,31 @@ main().catch((error) => {
 async function promptTemplateRef(theme: object, context: object): Promise<string | undefined> {
   const [release, commit] = await Promise.all([fetchLatestRelease(), fetchLatestCommit()]);
 
-  // No metadata (offline / rate-limited) — fall back to the default branch silently.
-  if (!release && !commit) return undefined;
-
-  // One-sentence intro followed by the two data points.
+  // One-sentence intro followed by the data points that are known.
   console.info(pc.dim('This create CLI allows you to get started with cella quickly.'));
   console.info();
 
-  if (release) console.info(`  Latest release:  ${release.tag} ${pc.dim(`· ${release.date}`)}`);
+  if (release)
+    console.info(`  Latest release:  ${release.tag}${release.date ? ` ${pc.dim(`· ${release.date}`)}` : ''}`);
   if (commit) {
     console.info(`  Latest commit:  ${commit.shortSha} ${pc.dim(`· ${commit.message} · ${commit.date}`)}`);
     // Clickable link to the exact commit on GitHub, in grey below the summary line.
     const repo = TEMPLATE_URL.replace('github:', '');
     console.info(`  ${pc.gray(`https://github.com/${repo}/commit/${commit.sha}`)}`);
   }
-  console.info();
+  if (release || commit) console.info();
 
-  // Only one available — use it without prompting.
-  if (!release) return 'main';
-  if (!commit) return release.tag;
+  // No release known (offline, or the template's tags did not answer): the app starts from the
+  // default branch, and the output says so.
+  if (!release) {
+    console.info(`${pc.yellow('⚠')} Latest release not found · using the latest commit on main`);
+    console.info();
+    return commit ? 'main' : undefined;
+  }
 
-  // Non-interactive (CI, piped stdin, no TTY): can't render the select — default to the
-  // latest release for a stable, reproducible scaffold rather than crashing the prompt.
-  if (!process.stdin.isTTY) {
+  // No commit to offer, or no TTY to render the select on (CI, piped stdin): take the latest
+  // release, the stable and reproducible starting point.
+  if (!commit || !process.stdin.isTTY) {
     confirmChoice('Latest release', release.tag);
     return release.tag;
   }

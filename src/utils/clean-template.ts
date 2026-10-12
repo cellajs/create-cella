@@ -7,6 +7,7 @@ import {
   getBackendEnvReplacements,
   INITIAL_VERSION,
   PLACEHOLDER_CONFIG,
+  SYNC_CONFIG,
   TO_CLEAN,
   TO_COPY,
   TO_REMOVE,
@@ -51,6 +52,9 @@ export async function cleanTemplate({
 
         // Reset release/versioning state so the fork starts under its own identity
         await resetReleaseState(targetFolder, projectName);
+
+        // Drop the template's own list of downstream repos from the sync config
+        await removeTemplateForks(targetFolder);
 
         // Generate backend .env from backend/.env.example.
         // The backend .env is the single source of truth for the project slug and DB ports
@@ -166,6 +170,37 @@ async function applyPlaceholderConfig(targetFolder: string, projectName: string,
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       console.info(`\n${warningMark} Fork config template "${src}" not found > Skip`);
+    } else {
+      throw err;
+    }
+  }
+}
+
+/**
+ * Remove the `forks` property, and a comment line directly above it, from the source of a sync
+ * config. Returns the source unchanged when it has no such property.
+ */
+export function stripForks(source: string): string {
+  // The closing bracket sits at the property's own indent, or on the same line for a short list
+  return source.replace(
+    /^(?:[ \t]*\/\/[^\n]*\n)?([ \t]*)forks:\s*\[(?:[^\n]*|[\s\S]*?\n\1)\],?[ \t]*\n(?:[ \t]*\n)?/m,
+    '',
+  );
+}
+
+/**
+ * The template's sync config lists the repos the template itself syncs to. A new app has none,
+ * and the sync CLI never merges this file, so the list is removed once here.
+ */
+async function removeTemplateForks(targetFolder: string): Promise<void> {
+  const configPath = path.resolve(targetFolder, SYNC_CONFIG);
+  try {
+    const source = await fs.readFile(configPath, 'utf8');
+    const stripped = stripForks(source);
+    if (stripped !== source) await fs.writeFile(configPath, stripped, 'utf8');
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      console.info(`\n${warningMark} "${SYNC_CONFIG}" not found > Skip forks removal`);
     } else {
       throw err;
     }
