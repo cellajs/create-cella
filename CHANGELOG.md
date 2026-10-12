@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.11](https://github.com/cellajs/create-cella/compare/create-cella-0.3.10...create-cella-0.3.11) (2026-10-12)
+
+
+### 🐞 Bug fixes
+
+* new apps render their seeded files, drop the template's forks and start from the latest release ([#37](https://github.com/cellajs/create-cella/issues/37)) ([6c1fc7e](https://github.com/cellajs/create-cella/commit/6c1fc7e6c71dc63a0e2e948bce3a787f030f8c84))
+
 ## [0.3.10](https://github.com/cellajs/create-cella/compare/create-cella-0.3.9...create-cella-0.3.10) (2026-10-10)
 
 
