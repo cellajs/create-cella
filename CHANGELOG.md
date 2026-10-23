@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.12](https://github.com/cellajs/create-cella/compare/create-cella-0.3.11...create-cella-0.3.12) (2026-10-23)
+
+
+### 🐞 Bug fixes
+
+* **deps:** installs run pnpm 11.28.7, which fixes three high advisories in 11.8.0 ([#39](https://github.com/cellajs/create-cella/issues/39)) ([cae8940](https://github.com/cellajs/create-cella/commit/cae89404ab534c2699d606e81026f048018b0936))
+
 ## [0.3.11](https://github.com/cellajs/create-cella/compare/create-cella-0.3.10...create-cella-0.3.11) (2026-10-12)
 
 
