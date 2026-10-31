@@ -113,7 +113,7 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
 
-      # Without a TTY the published scaffolder takes the latest release and skips the optional-modules prompt; the directory,
+      # Without a TTY the published scaffolder takes the latest release; the directory,
       # port offset and admin email are passed so no other prompt is reached.
       # pnpm serves a new version of a package a day after its publish, so the published legs can run the version before
       # npm's latest. The scaffolder's banner names the version that ran.

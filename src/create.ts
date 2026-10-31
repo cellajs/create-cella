@@ -1,17 +1,15 @@
 import { existsSync } from 'node:fs';
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { checkbox } from '@inquirer/prompts';
 import pc from 'picocolors';
 import { addRemote } from '#/add-remote';
 import { TEMPLATE_URL } from '#/constants';
-import { type CreateOptions, confirmChoice, showSuccess } from '#/modules/cli';
+import { type CreateOptions, showSuccess } from '#/modules/cli';
 import { cleanTemplate } from '#/utils/clean-template';
 import { downloadGithubTemplate } from '#/utils/download-template';
 import { gitAddAll, gitCommit, gitInit } from '#/utils/git';
 import { listTemplateFiles } from '#/utils/list-template-files';
 import { createProgress, pauseSpinner, resumeSpinner } from '#/utils/progress';
-import { optionalModuleFolders, scanOptionalModules } from '#/utils/scan-optional-modules';
 
 /** Check if a path is a local directory */
 function isLocalPath(path: string): boolean {
@@ -80,9 +78,6 @@ export async function create({
       baseSha = await downloadGithubTemplate(template, ref, targetFolder);
     }
 
-    // Ask which optional modules to keep, then drop deselected paths
-    if (!silent) await promptOptionalModules(targetFolder);
-
     // Clean the template, generate configs
     progress.step('cleaning template');
     const displayName = projectName.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -132,48 +127,4 @@ export async function create({
 
   // Display final success message
   showSuccess(projectName, targetFolder, relativePath, needsCd, packageManager);
-}
-
-/**
- * Scan the downloaded template for optional modules and let the user deselect them.
- * Deselected modules have their whole folder removed before cleaning. Default keeps
- * everything (parity with previous behavior).
- */
-async function promptOptionalModules(targetFolder: string): Promise<void> {
-  const modules = await scanOptionalModules(targetFolder);
-  if (modules.length === 0) return;
-
-  // Non-interactive (CI, piped stdin, no TTY): can't render a checkbox — keep every module
-  // rather than crashing with "User force closed the prompt". Matches the default-keep behavior.
-  if (!process.stdin.isTTY) return;
-
-  pauseSpinner();
-  // Blank line to separate the preceding progress step from this prompt.
-  console.info();
-  const keep = await checkbox(
-    {
-      message: 'Optional modules to include',
-      // Leading space on the radio icons adds a gap after the cursor (inquirer renders
-      // `${cursor}${checkbox} ${name}` with no space between cursor and checkbox).
-      theme: { icon: { checked: ` ${pc.green('◉')}`, unchecked: ' ◯' } },
-      choices: modules.map((m) => ({
-        name: `${m.name} ${pc.dim(`· ${m.description}`)}`,
-        value: m.name,
-        checked: true,
-      })),
-    },
-    // Clear the answered prompt so we can print a compact, non-bold summary that lists
-    // only the kept module names (not their descriptions).
-    { clearPromptOnDone: true },
-  );
-
-  // Keep the choice visible after the prompt clears: plain label plus the selected
-  // module names only (not their descriptions), or "none" when everything was deselected.
-  confirmChoice('Optional modules', keep.length ? keep.join(', ') : pc.dim('none'));
-  resumeSpinner();
-
-  // Remove every folder owned by a deselected module. `optionalModuleFolders` lists more
-  // route variants than any single module uses; `force: true` ignores the ones absent here.
-  const folders = modules.filter((m) => !keep.includes(m.name)).flatMap(optionalModuleFolders);
-  await Promise.all(folders.map((f) => rm(join(targetFolder, f), { recursive: true, force: true })));
 }
