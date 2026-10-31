@@ -24,7 +24,7 @@ pnpm create @cellajs/cella [directory] [options]
 ## What It Does
 
 1. Creates a new project from a Cella template snapshot
-2. Lets you choose optional modules, ports, and the seed admin email
+2. Lets you choose ports and the seed admin email
 3. Cleans the template and generates project-specific config
 4. Initializes a fresh git repository with an initial commit
 5. Adds the Cella upstream remote for future syncs
