@@ -16,7 +16,7 @@ pnpm create @cellajs/cella [directory] [options]
 | Option | Description |
 | --- | --- |
 | `--template <path>` | Use a custom template (local path or `github:user/repo`) |
-| `--port-offset <number>` | Set the port offset (0-490 in steps of 10) |
+| `--app-index <number>` | Set this app's number for its dev ports (0-9, not 4): frontend 3000 + N, services 4000 + 10N, database 5432 + 10N |
 | `--admin-email <email>` | Set the admin email for the initial seed user |
 | `-v, --version` | Output the current version |
 | `-h, --help` | Display the help message |

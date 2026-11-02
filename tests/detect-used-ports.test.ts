@@ -2,14 +2,19 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { detectUsedPorts, findNextOffset } from '#/utils/detect-used-ports';
+import { detectUsedPorts, findNextAppIndex, isAppIndex } from '#/utils/detect-used-ports';
 
-/** Write a fake sibling fork with the given config.development.ts content. */
-function writeFork(parent: string, name: string, configContent: string): void {
+/** Write a fake sibling app with the given config.development.ts and, optionally, config.default.ts content. */
+function writeFork(parent: string, name: string, configContent: string, defaultContent?: string): void {
   const configDir = join(parent, name, 'shared/config');
   mkdirSync(configDir, { recursive: true });
   writeFileSync(join(configDir, 'config.development.ts'), configContent, 'utf8');
+  if (defaultContent) writeFileSync(join(configDir, 'config.default.ts'), defaultContent, 'utf8');
 }
+
+const threeThousand =
+  "export const development = {\n  frontendUrl: 'http://localhost:3000',\n  backendUrl: 'http://localhost:3000/api',\n};\n";
+const templatePorts = 'devPorts: { frontend: 3000, api: 4000, cdcHealth: 4001 },';
 
 describe('detectUsedPorts', () => {
   let parent: string;
@@ -43,6 +48,20 @@ describe('detectUsedPorts', () => {
       'fork-sameorigin-bare',
       "export const development = {\n  frontendUrl: 'http://localhost:3030',\n  backendUrl: 'http://localhost:3030/api',\n};\n",
     );
+    // devAppIndex moves the template's ports (current generator output)
+    writeFork(
+      parent,
+      'fork-index',
+      threeThousand,
+      `export const config = {\n  devAppIndex: 6,\n  ${templatePorts}\n};\n`,
+    );
+    // Literal ports in both files, as raak has them: frontend on +1, services on +10
+    writeFork(
+      parent,
+      'fork-literal-default',
+      "export const development = {\n  frontendUrl: 'http://localhost:3001',\n  backendUrl: 'http://localhost:3001/api',\n};\n",
+      'export const config = {\n  devPorts: { frontend: 3001, api: 4010, cdcHealth: 4011 },\n};\n',
+    );
     // Not a fork: no config file
     mkdirSync(join(parent, 'unrelated-dir'), { recursive: true });
   });
@@ -51,22 +70,34 @@ describe('detectUsedPorts', () => {
     rmSync(parent, { recursive: true, force: true });
   });
 
-  it('detects all three config shapes and their backend ports', async () => {
+  it('detects every config shape and its ports', async () => {
     const used = await detectUsedPorts(target);
     const byProject = Object.fromEntries(used.map((u) => [u.project, u]));
 
-    expect(byProject['fork-devports']).toMatchObject({ frontend: 3020, backend: 4020, offset: 20 });
-    expect(byProject['fork-devports-custom']).toMatchObject({ frontend: 3050, backend: 4150, offset: 50 });
-    expect(byProject['fork-legacy']).toMatchObject({ frontend: 3010, backend: 4010, offset: 10 });
-    // No devPorts and no port in backendUrl: assume the paired service offset
-    expect(byProject['fork-sameorigin-bare']).toMatchObject({ frontend: 3030, backend: 4030, offset: 30 });
+    expect(byProject['fork-devports']).toMatchObject({ frontend: 3020, backend: 4020 });
+    expect(byProject['fork-devports-custom']).toMatchObject({ frontend: 3050, backend: 4150 });
+    expect(byProject['fork-legacy']).toMatchObject({ frontend: 3010, backend: 4010 });
+    // No devPorts and no port in backendUrl: assume the paired service port
+    expect(byProject['fork-sameorigin-bare']).toMatchObject({ frontend: 3030, backend: 4030 });
+    expect(byProject['fork-index']).toMatchObject({ frontend: 3006, backend: 4060 });
+    expect(byProject['fork-literal-default']).toMatchObject({ frontend: 3001, backend: 4010 });
     expect(byProject['unrelated-dir']).toBeUndefined();
   });
 
-  it('suggests the next free offset decade', async () => {
-    const used = await detectUsedPorts(target);
-    // 0 free (no fork on 3000), offsets 10/20/30 taken
-    expect(findNextOffset(used)).toBe(0);
-    expect(findNextOffset([...used, { project: 'x', frontend: 3000, backend: 4000, offset: 0 }])).toBe(40);
+  it('suggests the first index free on both the frontend and the service block, never 4', async () => {
+    const at = (project: string, frontend: number, backend: number) => ({ project, frontend, backend });
+    expect(findNextAppIndex([])).toBe(0);
+    // A frontend of 3001 takes index 1, services on 4020 take index 2, whatever the other port is
+    expect(findNextAppIndex([at('a', 3000, 4000), at('b', 3001, 4310), at('c', 3320, 4020)])).toBe(3);
+    expect(findNextAppIndex([at('a', 3000, 4000), at('b', 3001, 4010), at('c', 3002, 4020), at('d', 3003, 4030)])).toBe(
+      5,
+    );
+  });
+});
+
+describe('isAppIndex', () => {
+  it('takes 0-9 without 4', () => {
+    expect([0, 3, 5, 9].every(isAppIndex)).toBe(true);
+    expect([4, -1, 10, 1.5, Number.NaN].some(isAppIndex)).toBe(false);
   });
 });

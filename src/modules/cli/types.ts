@@ -1,7 +1,7 @@
 /** CLI options parsed from command line arguments */
 export interface CLIOptions {
   template?: string;
-  portOffset?: number;
+  appIndex?: number;
   adminEmail?: string;
 }
 
@@ -21,8 +21,8 @@ export interface CreateOptions {
   templateUrl?: string;
   /** Git ref (release tag or branch) to check out the template at. Ignored for local templates. */
   templateRef?: string;
-  /** Port offset to avoid collisions with sibling forks (0 = default ports) */
-  portOffset: number;
+  /** This app's number on the machine, sets `devAppIndex` and the database ports (0 = default ports) */
+  appIndex: number;
   /** Admin email for initial seed user (defaults to admin@{slug}.example.com) */
   adminEmail?: string;
   /** Suppress all output (for testing) */

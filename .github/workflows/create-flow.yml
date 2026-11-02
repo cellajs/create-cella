@@ -114,7 +114,8 @@ jobs:
           pnpm build
 
       # Without a TTY the published scaffolder takes the latest release; the directory,
-      # port offset and admin email are passed so no other prompt is reached.
+      # app index and admin email are passed so no other prompt is reached.
+      # A published scaffolder older than --app-index rejects the flag before it creates anything, so --port-offset follows.
       # pnpm serves a new version of a package a day after its publish, so the published legs can run the version before
       # npm's latest. The scaffolder's banner names the version that ran.
       - name: Create the app
@@ -127,11 +128,13 @@ jobs:
           set -euo pipefail
           case "$LEG" in
             published)
-              pnpm create @cellajs/cella my-app --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
+              pnpm create @cellajs/cella my-app --app-index 0 --admin-email "$ADMIN_EMAIL" ||
+                pnpm create @cellajs/cella my-app --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
             published-main)
-              pnpm create @cellajs/cella my-app --template github:cellajs/cella --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
+              pnpm create @cellajs/cella my-app --template github:cellajs/cella --app-index 0 --admin-email "$ADMIN_EMAIL" ||
+                pnpm create @cellajs/cella my-app --template github:cellajs/cella --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
             heads)
-              node "$GITHUB_WORKSPACE/index.js" my-app --template "$CELLA_DIR" --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
+              node "$GITHUB_WORKSPACE/index.js" my-app --template "$CELLA_DIR" --app-index 0 --admin-email "$ADMIN_EMAIL" ;;
           esac 2>&1 | tee "$RUNNER_TEMP/create.log"
           ran=$(sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/create.log" | sed -n 's/.*create cella [^0-9]*\([0-9][0-9A-Za-z.-]*\).*/\1/p' | head -1)
           echo "ran=${ran:-unknown}" >> "$GITHUB_OUTPUT"

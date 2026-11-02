@@ -22,7 +22,7 @@ export async function create({
   packageManager,
   templateUrl,
   templateRef,
-  portOffset,
+  appIndex,
   adminEmail,
   silent = false,
 }: CreateOptions): Promise<void> {
@@ -81,7 +81,7 @@ export async function create({
     // Clean the template, generate configs
     progress.step('cleaning template');
     const displayName = projectName.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    await cleanTemplate({ targetFolder, projectName, displayName, portOffset, adminEmail });
+    await cleanTemplate({ targetFolder, projectName, displayName, appIndex, adminEmail });
 
     // Initialize git repository. Git runs offline via isomorphic-git with an explicit
     // author, so it can't fail on missing user config — but if it fails for any other

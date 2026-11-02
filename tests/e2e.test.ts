@@ -25,7 +25,7 @@ describe('create-cella e2e', () => {
       projectName,
       targetFolder,
       packageManager: 'pnpm',
-      portOffset: 0,
+      appIndex: 0,
       templateUrl: 'github:cellajs/cella',
       silent: true,
     });
