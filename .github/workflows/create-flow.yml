@@ -9,7 +9,8 @@ name: Create flow
 #   published        the published scaffolder with cella's latest release: what `pnpm create @cellajs/cella` gives today
 #   published-main   the published scaffolder with cella main: the "Latest commit" choice in its prompt
 #   heads            this checkout with the cella clone, so a create-cella PR or a cella branch can be tried
-# Checks cella runs on itself every day (pnpm check, pnpm test, pnpm build) are left out on purpose.
+# Checks cella runs on itself every day (pnpm check, pnpm build) are left out on purpose. pnpm test stays, on the heads
+# leg: a new app runs it with the config this package writes, which cella's own runs never see.
 # The smoke driver lives in cella (cella/skills/verify/smoke-driver.mjs) and is run from the clone, never from the
 # created app: the published leg builds its app at a release that may not carry the driver yet. Reproduce a leg
 # locally by following the README in a new app and running that driver from it.
@@ -158,6 +159,15 @@ jobs:
           grep -q '^PROJECT_SLUG=my-app$' backend/.env
           grep -q "^ADMIN_EMAIL=$ADMIN_EMAIL$" backend/.env
           test -f frontend/.env
+          # What this checkout writes; a published scaffolder before it has none of these
+          if [ "$LEG" = heads ]; then
+            test -f AGENTS.md
+            test -f CLAUDE.md
+            test -e .claude/skills/add-entity/SKILL.md
+            grep -oE '\]\(\./[^)#]*' README.md | sed 's/](//' | while read -r link; do
+              test -e "$link" || { echo "::error::README.md links to $link, which the app does not have"; exit 1; }
+            done
+          fi
           git remote get-url cella-upstream | grep -q 'cellajs/cella'
           if grep -q 'forks:' cella/cella.config.ts; then echo "::error::cella/cella.config.ts lists the template's own forks"; exit 1; fi
           base=$(git log -1 --format=%B | sed -n 's/^Cella-Base: //p')
@@ -229,6 +239,12 @@ jobs:
           OUT_DIR: ${{ runner.temp }}/smoke
         run: node "$CELLA_DIR/cella/skills/verify/smoke-driver.mjs"
 
+      - name: pnpm test
+        id: test
+        if: matrix.leg == 'heads' && steps.smoke.outcome == 'success'
+        working-directory: ${{ env.APP_DIR }}
+        run: pnpm test
+
       # cella's `pnpm template:check` covers the config the template itself carries, on every cella PR. This covers
       # the files this package writes from its own string templates, which that check never sees, and their formatting.
       - name: The generated config typechecks and is formatted
@@ -266,6 +282,7 @@ jobs:
           O_DOCKER: ${{ steps.docker.outcome }}
           O_SEED: ${{ steps.seed.outcome }}
           O_SMOKE: ${{ steps.smoke.outcome }}
+          O_TEST: ${{ steps.test.outcome }}
           O_CONFIG: ${{ steps.config.outcome }}
         run: |
           if [ "$LEG" = heads ]; then
@@ -287,5 +304,6 @@ jobs:
             echo "| pnpm docker | $O_DOCKER |"
             echo "| pnpm seed | $O_SEED |"
             echo "| pnpm dev + signed-in smoke | $O_SMOKE |"
+            echo "| pnpm test (heads only) | $O_TEST |"
             echo "| generated config typechecks and is formatted | $O_CONFIG |"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -53,8 +53,9 @@ describe('create-cella e2e', () => {
       expect(existsSync(readmePath)).toBe(true);
 
       const content = readFileSync(readmePath, 'utf-8');
-      // Check for QUICKSTART.md content markers
-      expect(content).toContain('# Quickstart');
+      // Check for QUICKSTART.md content markers, without the create step that just ran
+      expect(content).toContain('## Run');
+      expect(content).not.toContain('## Create');
       expect(content).toContain('pnpm docker');
       expect(content).toContain('pnpm dev');
     });

@@ -2,11 +2,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import pc from 'picocolors';
 import {
+  AGENT_FILES,
   generateEnvConfigs,
   generateEnvFromExample,
   getBackendEnvReplacements,
   INITIAL_VERSION,
   PLACEHOLDER_CONFIG,
+  QUICKSTART,
+  quickstartToReadme,
   SYNC_CONFIG,
   setDevAppIndex,
   TO_CLEAN,
@@ -47,6 +50,9 @@ export async function cleanTemplate({
           const destAbsolutePath = path.resolve(targetFolder, dest);
           await copyFile(srcAbsolutePath, destAbsolutePath);
         }
+
+        await writeReadme(targetFolder, displayName, appIndex);
+        await writeAgentEntry(targetFolder);
 
         // Replace config.default.ts with interpolated placeholder config
         await applyPlaceholderConfig(targetFolder, projectName, displayName, appIndex);
@@ -99,6 +105,36 @@ export async function cleanTemplate({
       }
     })();
   });
+}
+
+/** Write the app's README from the template's quickstart. A template without one keeps its own README. */
+async function writeReadme(targetFolder: string, displayName: string, appIndex: number): Promise<void> {
+  try {
+    const quickstart = await fs.readFile(path.resolve(targetFolder, QUICKSTART), 'utf8');
+    const readme = quickstartToReadme(quickstart, displayName, appIndex);
+    await fs.writeFile(path.resolve(targetFolder, 'README.md'), readme, 'utf8');
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    console.info(`\n${warningMark} "${QUICKSTART}" not found > Skip README`);
+  }
+}
+
+/** Point coding agents at the template's rules and skills, which sit in `cella/`, out of a root they would not search. */
+async function writeAgentEntry(targetFolder: string): Promise<void> {
+  await Promise.all(
+    Object.entries(AGENT_FILES).map(([file, content]) =>
+      fs.writeFile(path.resolve(targetFolder, file), content, 'utf8'),
+    ),
+  );
+
+  // Local to this clone: `.claude` is gitignored, and the check scripts read tracked paths as files. AGENTS.md names the folder for a new clone.
+  try {
+    await fs.mkdir(path.resolve(targetFolder, '.claude'), { recursive: true });
+    await fs.symlink('../cella/skills', path.resolve(targetFolder, '.claude/skills'));
+  } catch (err: unknown) {
+    // Windows refuses a symlink without developer mode; the skills stay readable under cella/skills
+    console.info(`\n${warningMark} skipped .claude/skills: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 /**

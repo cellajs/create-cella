@@ -55,10 +55,10 @@ export async function detectUsedPorts(targetFolder: string): Promise<UsedPorts[]
 export const isAppIndex = (index: number): boolean =>
   Number.isInteger(index) && index >= 0 && index <= 9 && index !== 4;
 
-/** Find the first app index whose frontend port and service block no sibling uses. */
-export function findNextAppIndex(usedPorts: UsedPorts[]): number {
+/** Find the first app index whose frontend port and service block no sibling uses and that `isBusy` leaves free. */
+export function findNextAppIndex(usedPorts: UsedPorts[], isBusy: (index: number) => boolean = () => false): number {
   for (let index = 0; index <= 9; index += 1) {
-    if (!isAppIndex(index)) continue;
+    if (!isAppIndex(index) || isBusy(index)) continue;
     const api = 4000 + index * 10;
     const taken = usedPorts.some((p) => p.frontend === 3000 + index || (p.backend >= api && p.backend < api + 10));
     if (!taken) return index;

@@ -8,8 +8,10 @@ import pc from 'picocolors';
 import { TEMPLATE_URL } from '#/constants';
 import { create } from '#/create';
 import { type CreateOptions, cli, confirmChoice, showWelcome } from '#/modules/cli';
+import { findBusyPorts } from '#/utils/busy-ports';
 import { detectUsedPorts, findNextAppIndex, isAppIndex } from '#/utils/detect-used-ports';
 import { fetchLatestCommit, fetchLatestRelease } from '#/utils/fetch-template-metadata';
+import { isEmail } from '#/utils/is-email';
 import { isEmptyDirectory } from '#/utils/is-empty-directory';
 import { validateProjectName } from '#/utils/validate-project-name';
 
@@ -75,6 +77,13 @@ async function main(): Promise<void> {
   // Scan sibling directories and prompt for the app index
   const appIndex = cli.options.appIndex ?? (await promptAppIndex(targetFolder, promptTheme, promptContext));
   confirmChoice('App index', formatAppIndex(appIndex));
+  const busyPorts = await findBusyPorts(appIndex);
+  if (busyPorts.length > 0) {
+    console.info(
+      `${pc.yellow('⚠')} In use on this machine: ${busyPorts.join(', ')}. Stop what holds them before pnpm docker and pnpm dev.`,
+    );
+    console.info();
+  }
 
   // Prompt for admin email. Default uses the reserved `example.com` domain (RFC 2606) so the
   // seed address can never resolve or route real mail — it's a placeholder, not a real inbox.
@@ -85,6 +94,7 @@ async function main(): Promise<void> {
         message: 'Admin email for initial seed user',
         default: 'admin@example.com',
         theme: promptTheme,
+        validate: (email) => (isEmail(email) ? true : 'Enter an address such as admin@example.com'),
       },
       promptContext,
     ));
@@ -149,7 +159,7 @@ async function promptTemplateRef(theme: object, context: object): Promise<string
 
   const choice = await select(
     {
-      message: 'Choose where to fork cella from:',
+      message: 'Choose which cella version to start from:',
       theme,
       choices: [
         { name: 'Latest release', value: 'release' },
@@ -178,7 +188,11 @@ function formatAppIndex(i: number, suffix = ''): string {
 /** Scan sibling apps and prompt the user to pick an app index */
 async function promptAppIndex(targetFolder: string, theme: object, context: object): Promise<number> {
   const usedPorts = await detectUsedPorts(targetFolder);
-  const suggested = findNextAppIndex(usedPorts);
+  const presets = [1, 2, 3];
+  const busy = new Map(await Promise.all([0, ...presets].map(async (i) => [i, await findBusyPorts(i)] as const)));
+  const isBusy = (i: number) => (busy.get(i)?.length ?? 0) > 0;
+  const suggested = findNextAppIndex(usedPorts, isBusy);
+  const label = (i: number, note = '') => formatAppIndex(i, isBusy(i) ? ` (port ${busy.get(i)?.[0]} in use)` : note);
 
   // Fold a compact hint into the prompt message itself so it's wiped by clearPromptOnDone
   // once an index is chosen — no leftover "Detected forks" trail. Override the default
@@ -186,7 +200,7 @@ async function promptAppIndex(targetFolder: string, theme: object, context: obje
   let message = `${pc.bold('App index')} ${pc.dim('· to avoid port conflicts with other apps on this machine')}`;
   if (usedPorts.length > 0) {
     const count = usedPorts.length;
-    message += pc.dim(`\nDetected ${count} sibling fork${count === 1 ? '' : 's'} · suggested index ${suggested}`);
+    message += pc.dim(`\nDetected ${count} sibling app${count === 1 ? '' : 's'} · suggested index ${suggested}`);
   }
   const portTheme = {
     ...(theme as Record<string, unknown>),
@@ -195,15 +209,14 @@ async function promptAppIndex(targetFolder: string, theme: object, context: obje
 
   // Presets exclude 0 (always offered as the explicit default below) and the suggested
   // value (offered first) to avoid duplicate choices.
-  const presets = [1, 2, 3].filter((i) => i !== suggested);
   const choice = await select(
     {
       message,
       theme: portTheme,
       choices: [
         ...(suggested > 0 ? [{ name: formatAppIndex(suggested, ' (suggested)'), value: suggested }] : []),
-        { name: formatAppIndex(0, ' (default)'), value: 0 },
-        ...presets.map((i) => ({ name: formatAppIndex(i), value: i })),
+        { name: label(0, ' (default)'), value: 0 },
+        ...presets.filter((i) => i !== suggested).map((i) => ({ name: label(i), value: i })),
         { name: 'Custom index', value: -1 },
       ],
     },

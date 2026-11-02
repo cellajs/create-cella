@@ -19,8 +19,8 @@ export const TEMPLATE_GIT_URL = `https://github.com/${TEMPLATE_REPOSITORY}.git`;
 /** The app's sync config, which the template ships with its own settings. */
 export const SYNC_CONFIG = 'cella/cella.config.ts';
 
-/** URL to the repository */
-export const CELLA_REMOTE_URL = 'git@github.com:cellajs/cella.git';
+/** Upstream remote of a new app: HTTPS, so reading a public template needs no SSH key. */
+export const CELLA_REMOTE_URL = TEMPLATE_GIT_URL;
 
 /**
  * Git remote name pointing at upstream cella. Matches the name the sync CLI
@@ -54,8 +54,33 @@ export const TO_CLEAN: string[] = ['./backend/drizzle'];
 // Files to copy/paste after downloading
 export const TO_COPY: Record<string, string> = {
   './frontend/.env.example': './frontend/.env',
-  './cella/QUICKSTART.md': 'README.md',
 };
+
+/** The template's quickstart, which becomes the new app's README. */
+export const QUICKSTART = './cella/QUICKSTART.md';
+
+/** Entry points a coding agent reads from the repo root; the rules and skills live in the template's `cella/` folder. */
+export const AGENT_FILES: Record<string, string> = {
+  'AGENTS.md':
+    '# Agent guidelines\n\nThis app is built from the cella template. Read [cella/AGENTS.md](./cella/AGENTS.md) before changing code: it holds the project rules. Skills, such as `add-entity`, live in [cella/skills](./cella/skills).\n',
+  'CLAUDE.md': '@cella/AGENTS.md\n',
+};
+
+/** Frontend dev port of an app number. */
+export const frontendPort = (appIndex: number): number => 3000 + appIndex;
+
+/**
+ * The quickstart as the README of a new app: at the repo root, with this app's port and without the step that just ran.
+ * Its links are relative to `cella/` in the template, so `./x` becomes `./cella/x` and `../x` becomes `./x`.
+ */
+export function quickstartToReadme(source: string, displayName: string, appIndex: number): string {
+  return source
+    .replace(/^# .*$/m, `# ${displayName}`)
+    .replace(/^## Create\n[\s\S]*?(?=^## )/m, '')
+    .replaceAll('](./', '](./cella/')
+    .replaceAll('](../', '](./')
+    .replaceAll('http://localhost:3000', `http://localhost:${frontendPort(appIndex)}`);
+}
 
 /**
  * Fork config template that replaces `shared/config/config.default.ts` in new forks.
@@ -183,6 +208,9 @@ export function generateEnvConfigs(slug: string, name: string): Record<string, s
         yjsUrl: '=development.yjsUrl',
         mcpUrl: '=development.mcpUrl',
         oauthUrl: '=development.oauthUrl',
+        // The suite covers every service and signs storage URLs, as cella's own test config has it
+        services: '={ yjs: { enabled: true }, mcp: { enabled: true }, oauth: { enabled: true } }',
+        s3: '=development.s3',
       },
     },
     production: { props: { maintenance: false } },

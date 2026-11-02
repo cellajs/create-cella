@@ -109,11 +109,12 @@ describe('generateEnvConfigs', () => {
     expect(dev).not.toContain('devPorts');
   });
 
-  it('points development at the shared development buckets, and no other mode', () => {
+  it('points development at the shared development buckets, and only the local test mode follows it', () => {
     expect(configs['./shared/config/config.development.ts']).toContain(
       `  ${"s3: { region: 'nl-ams', host: 's3.nl-ams.scw.cloud', publicBucket: 'cella-shared-public', privateBucket: 'cella-shared-private' }"},\n`,
     );
-    for (const mode of ['staging', 'tunnel', 'test', 'production']) {
+    expect(configs['./shared/config/config.test.ts']).toContain('s3: development.s3');
+    for (const mode of ['staging', 'tunnel', 'production']) {
       expect(configs[`./shared/config/config.${mode}.ts`]).not.toContain('s3:');
     }
   });

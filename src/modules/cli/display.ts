@@ -1,5 +1,5 @@
 import pc from 'picocolors';
-import { DESCRIPTION, DIVIDER, getHeaderLine } from '#/constants';
+import { DESCRIPTION, DIVIDER, frontendPort, getHeaderLine } from '#/constants';
 
 /** ASCII art logo for the CLI welcome screen. */
 function showAscii(): void {
@@ -42,6 +42,8 @@ export function showSuccess(
   relativePath: string,
   needsCd: boolean,
   packageManager: string,
+  appIndex: number,
+  adminEmail: string,
 ): void {
   console.info();
 
@@ -56,6 +58,10 @@ export function showSuccess(
   console.info(`${pc.dim('$')} ${pc.cyan(`${packageManager} generate`)}`);
   console.info(
     `${pc.dim('$')} ${pc.cyan(`${packageManager} docker`)} ${pc.dim('&&')} ${pc.cyan(`${packageManager} seed`)} ${pc.dim('&&')} ${pc.cyan(`${packageManager} dev`)}`,
+  );
+  console.info();
+  console.info(
+    `${pc.gray('Then open')} ${pc.cyan(`http://localhost:${frontendPort(appIndex)}`)} ${pc.gray('and sign in as')} ${pc.cyan(adminEmail)}${pc.gray(`: the magic link is printed in the ${packageManager} dev output.`)}`,
   );
   console.info();
 
