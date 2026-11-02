@@ -2,6 +2,7 @@ import { basename, resolve } from 'node:path';
 import { Command, InvalidArgumentError } from 'commander';
 import { NAME, VERSION } from '#/constants';
 import { isAppIndex } from '#/utils/detect-used-ports';
+import { isEmail } from '#/utils/is-email';
 import { validateProjectName } from '#/utils/validate-project-name';
 import type { CLIConfig, CLIOptions } from './types';
 
@@ -13,6 +14,11 @@ function parseAppIndex(value: string): number {
   }
 
   return parsed;
+}
+
+function parseAdminEmail(value: string): string {
+  if (!isEmail(value)) throw new InvalidArgumentError('Admin email must be an address such as admin@example.com');
+  return value;
 }
 
 // Initialize CLI variables
@@ -30,15 +36,17 @@ export const command = new Command(NAME)
   .helpOption('-h, --help', 'display this help message')
   .option('--template <path>', 'use a custom template (local path or github:user/repo)')
   .option('--app-index <number>', "set this app's number for its dev ports (0-9, not 4)", parseAppIndex)
-  .option('--admin-email <email>', 'set the admin email for the initial seed user')
-  .action((name: string) => {
+  .option('--admin-email <email>', 'set the admin email for the initial seed user', parseAdminEmail)
+  .action((name: string, _options: CLIOptions, self: Command) => {
     const trimmedName = typeof name === 'string' ? name.trim() : name;
 
     if (trimmedName) {
       const validation = validateProjectName(basename(resolve(trimmedName)));
 
       if (!validation.valid) {
-        throw new InvalidArgumentError(`Invalid project name: ${validation.problems?.[0] ?? 'unknown error'}`);
+        self.error(
+          `error: invalid project name "${trimmedName}": ${validation.problems?.[0] ?? 'unknown error'}. Use lowercase letters, digits and dashes, such as my-app.`,
+        );
       }
 
       directory = trimmedName;

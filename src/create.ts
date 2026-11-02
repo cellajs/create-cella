@@ -126,5 +126,13 @@ export async function create({
   const relativePath = relative(originalCwd, targetFolder);
 
   // Display final success message
-  showSuccess(projectName, targetFolder, relativePath, needsCd, packageManager);
+  showSuccess(
+    projectName,
+    targetFolder,
+    relativePath,
+    needsCd,
+    packageManager,
+    appIndex,
+    adminEmail ?? `admin@${projectName}.example.com`,
+  );
 }
