@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/cellajs/create-cella/compare/create-cella-0.3.12...create-cella-0.4.0) (2026-11-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* one dev port number per app, --app-index replaces --port-offset ([#42](https://github.com/cellajs/create-cella/issues/42))
+
+### 🎉 New features
+
+* one dev port number per app, --app-index replaces --port-offset ([#42](https://github.com/cellajs/create-cella/issues/42)) ([539ca53](https://github.com/cellajs/create-cella/commit/539ca5386b118e7f63068ecc78a36be976a09194))
+
+
+### 🐞 Bug fixes
+
+* a new app points at the right port, readme links and agent rules ([#44](https://github.com/cellajs/create-cella/issues/44)) ([aae7d02](https://github.com/cellajs/create-cella/commit/aae7d0210cd507300748e3d0d8856754b2161b87))
+
 ## [0.3.12](https://github.com/cellajs/create-cella/compare/create-cella-0.3.11...create-cella-0.3.12) (2026-10-31)
 
 
