@@ -25,7 +25,7 @@ describe('create-cella e2e', () => {
       projectName,
       targetFolder,
       packageManager: 'pnpm',
-      portOffset: 0,
+      appIndex: 0,
       templateUrl: 'github:cellajs/cella',
       silent: true,
     });
@@ -178,7 +178,7 @@ describe('create-cella e2e', () => {
       const content = readFileSync(join(targetFolder, 'shared', 'config', 'config.development.ts'), 'utf-8');
       expect(content).toContain("mode: 'development'");
       expect(content).toContain("'http://localhost:3000'");
-      expect(content).toContain('api: 4000');
+      expect(content).not.toContain('devPorts');
       expect(content).toContain("publicBucket: 'cella-shared-public'");
       expect(content).not.toContain("name: 'Cella DEVELOPMENT'");
     });

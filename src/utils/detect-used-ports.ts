@@ -5,14 +5,13 @@ interface UsedPorts {
   project: string;
   frontend: number;
   backend: number;
-  offset: number;
 }
 
 /**
- * Scan sibling directories for existing cella forks and extract their dev ports.
+ * Scan sibling directories for existing cella apps and extract their dev ports.
  * Looks for `shared/config/config.development.ts` to identify cella-based projects.
- * Handles both config shapes: same-origin (frontendUrl carries the only URL port,
- * services listen on `devPorts`) and legacy (backendUrl on its own port).
+ * `devPorts` sits in that file or in `config.default.ts`, and `devAppIndex` in the latter moves
+ * whatever ports the two files carry. Handles legacy configs with backendUrl on its own port.
  */
 export async function detectUsedPorts(targetFolder: string): Promise<UsedPorts[]> {
   const parentDir = dirname(targetFolder);
@@ -26,40 +25,43 @@ export async function detectUsedPorts(targetFolder: string): Promise<UsedPorts[]
   }
 
   for (const name of siblings) {
-    const configPath = join(parentDir, name, 'shared/config/config.development.ts');
+    const configDir = join(parentDir, name, 'shared/config');
     try {
-      const content = await readFile(configPath, 'utf8');
-      const feMatch = content.match(/frontendUrl:\s*'http:\/\/localhost:(\d+)/);
+      const development = await readFile(join(configDir, 'config.development.ts'), 'utf8');
+      const defaults = await readFile(join(configDir, 'config.default.ts'), 'utf8').catch(() => '');
+      const feMatch = development.match(/frontendUrl:\s*'http:\/\/localhost:(\d+)/);
       if (!feMatch) continue;
       const frontend = Number(feMatch[1]);
-      // Same-origin shape: service ports live in devPorts. Legacy shape: backendUrl
-      // has its own port. Oldest forks predate both; assume the paired offset then.
-      const devPortsMatch = content.match(/devPorts:\s*\{[^}]*?\bapi:\s*(\d+)/);
-      const legacyBeMatch = content.match(/backendUrl:\s*'http:\/\/localhost:(\d+)'/);
+      const index = Number(defaults.match(/devAppIndex:\s*(\d+)/)?.[1] ?? 0);
+      // Oldest forks predate devPorts and a backendUrl port; assume the paired port then.
+      const apiPattern = /devPorts:\s*\{[^}]*?\bapi:\s*(\d+)/;
+      const devPortsMatch = development.match(apiPattern) ?? defaults.match(apiPattern);
+      const legacyBeMatch = development.match(/backendUrl:\s*'http:\/\/localhost:(\d+)'/);
       const backend = devPortsMatch
         ? Number(devPortsMatch[1])
         : legacyBeMatch
           ? Number(legacyBeMatch[1])
           : frontend + 1000;
-      used.push({
-        project: name,
-        frontend,
-        backend,
-        offset: frontend - 3000,
-      });
+      used.push({ project: name, frontend: frontend + index, backend: backend + index * 10 });
     } catch {
-      // Not a cella fork, skip
+      // Not a cella app, skip
     }
   }
 
   return used;
 }
 
-/** Find the next available offset (in steps of 10) that doesn't collide with existing forks. */
-export function findNextOffset(usedPorts: UsedPorts[]): number {
-  const usedOffsets = new Set(usedPorts.map((p) => p.offset));
-  for (let offset = 0; offset <= 490; offset += 10) {
-    if (!usedOffsets.has(offset)) return offset;
+/** Index 4 is never offered: its internal listener would sit on 4045, which fetch refuses. */
+export const isAppIndex = (index: number): boolean =>
+  Number.isInteger(index) && index >= 0 && index <= 9 && index !== 4;
+
+/** Find the first app index whose frontend port and service block no sibling uses. */
+export function findNextAppIndex(usedPorts: UsedPorts[]): number {
+  for (let index = 0; index <= 9; index += 1) {
+    if (!isAppIndex(index)) continue;
+    const api = 4000 + index * 10;
+    const taken = usedPorts.some((p) => p.frontend === 3000 + index || (p.backend >= api && p.backend < api + 10));
+    if (!taken) return index;
   }
   return 0;
 }

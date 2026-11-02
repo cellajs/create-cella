@@ -55,15 +55,7 @@ describe('release smoke', () => {
     const bin = join(installDir, 'node_modules', '.bin', 'create-cella');
     execFileSync(
       bin,
-      [
-        targetFolder,
-        '--template',
-        'github:cellajs/cella',
-        '--port-offset',
-        '10',
-        '--admin-email',
-        'admin@smoke-app.com',
-      ],
+      [targetFolder, '--template', 'github:cellajs/cella', '--app-index', '1', '--admin-email', 'admin@smoke-app.com'],
       {
         cwd: installDir,
         encoding: 'utf8',
@@ -79,22 +71,21 @@ describe('release smoke', () => {
 
     const backendEnv = readFileSync(backendEnvPath, 'utf8');
     const developmentConfig = readFileSync(developmentConfigPath, 'utf8');
+    const defaultConfig = readFileSync(join(targetFolder, 'shared', 'config', 'config.default.ts'), 'utf8');
 
     expect(backendEnv).toContain('PROJECT_SLUG=smoke-app');
     expect(backendEnv).toContain('DB_PORT=5442');
     expect(backendEnv).toContain('DB_TEST_PORT=5444');
     expect(backendEnv).toContain('DATABASE_URL=postgres://runtime_role:dev_password@0.0.0.0:5442/postgres');
     expect(backendEnv).toContain('ADMIN_EMAIL=admin@smoke-app.com');
-    // Service ports come from devPorts; a PORT= line would override the offset.
+    // Service ports come from devPorts; a PORT= line would override devAppIndex.
     expect(backendEnv).not.toMatch(/^PORT=/m);
 
     expect(developmentConfig).toContain("slug: 'smoke-app-development'");
-    expect(developmentConfig).toContain("frontendUrl: 'http://localhost:3010'");
-    expect(developmentConfig).toContain("backendUrl: 'http://localhost:3010/api'");
-    expect(developmentConfig).toContain("backendAuthUrl: 'http://localhost:3010/api/auth'");
-    expect(developmentConfig).toContain(
-      'devPorts: { frontend: 3010, api: 4010, cdcHealth: 4011, yjs: 4012, mcp: 4013, oauth: 4014, internal: 4015, jobs: 4016 }',
-    );
+    expect(developmentConfig).toContain("frontendUrl: 'http://localhost:3000'");
+    expect(developmentConfig).toContain("backendUrl: 'http://localhost:3000/api'");
+    expect(developmentConfig).toContain("backendAuthUrl: 'http://localhost:3000/api/auth'");
+    expect(defaultConfig).toContain('devAppIndex: 1');
     expect(developmentConfig).toContain("publicBucket: 'cella-shared-public'");
 
     // The template's own list of downstream repos is gone from the app's sync config

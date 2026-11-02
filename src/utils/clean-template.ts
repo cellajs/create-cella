@@ -8,6 +8,7 @@ import {
   INITIAL_VERSION,
   PLACEHOLDER_CONFIG,
   SYNC_CONFIG,
+  setDevAppIndex,
   TO_CLEAN,
   TO_COPY,
   TO_REMOVE,
@@ -23,13 +24,13 @@ export async function cleanTemplate({
   targetFolder,
   projectName,
   displayName,
-  portOffset = 0,
+  appIndex = 0,
   adminEmail = `admin@${projectName}.example.com`,
 }: {
   targetFolder: string;
   projectName: string;
   displayName: string;
-  portOffset?: number;
+  appIndex?: number;
   adminEmail?: string;
 }): Promise<void> {
   // Change the current working directory to targetFolder if not already set
@@ -48,7 +49,7 @@ export async function cleanTemplate({
         }
 
         // Replace config.default.ts with interpolated placeholder config
-        await applyPlaceholderConfig(targetFolder, projectName, displayName);
+        await applyPlaceholderConfig(targetFolder, projectName, displayName, appIndex);
 
         // Reset release/versioning state so the fork starts under its own identity
         await resetReleaseState(targetFolder, projectName);
@@ -59,7 +60,7 @@ export async function cleanTemplate({
         // Generate backend .env from backend/.env.example.
         // The backend .env is the single source of truth for the project slug and DB ports
         // (consumed by backend/compose.yaml). There is no root .env.
-        const backendReplacements = getBackendEnvReplacements(projectName, adminEmail, portOffset);
+        const backendReplacements = getBackendEnvReplacements(projectName, adminEmail, appIndex);
         const backendEnv = await generateEnvFromExample(
           path.resolve(targetFolder, 'backend/.env.example'),
           backendReplacements,
@@ -68,8 +69,8 @@ export async function cleanTemplate({
           await fs.writeFile(path.resolve(targetFolder, 'backend/.env'), backendEnv, 'utf8');
         }
 
-        // Generate minimal env config files with project values and ports baked in
-        const envConfigs = generateEnvConfigs(projectName, displayName, portOffset);
+        // Generate minimal env config files with project values baked in
+        const envConfigs = generateEnvConfigs(projectName, displayName);
         await Promise.all(
           Object.entries(envConfigs).map(([filePath, content]) =>
             fs.writeFile(path.resolve(targetFolder, filePath), content, 'utf8'),
@@ -157,7 +158,12 @@ async function copyFile(src: string, dest: string): Promise<void> {
  * result as `shared/config/config.default.ts` — replacing the original — and
  * delete the now-consumed template from the fork.
  */
-async function applyPlaceholderConfig(targetFolder: string, projectName: string, displayName: string): Promise<void> {
+async function applyPlaceholderConfig(
+  targetFolder: string,
+  projectName: string,
+  displayName: string,
+  appIndex: number,
+): Promise<void> {
   const src = path.resolve(targetFolder, PLACEHOLDER_CONFIG);
   const dest = path.resolve(targetFolder, './shared/config/config.default.ts');
 
@@ -165,6 +171,7 @@ async function applyPlaceholderConfig(targetFolder: string, projectName: string,
     let content = await fs.readFile(src, 'utf8');
     content = content.replaceAll('__project_name__', displayName);
     content = content.replaceAll('__project_slug__', projectName);
+    content = setDevAppIndex(content, appIndex);
     await fs.writeFile(dest, content, 'utf8');
     await fs.rm(src, { force: true });
   } catch (err: unknown) {

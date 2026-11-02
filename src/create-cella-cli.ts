@@ -8,7 +8,7 @@ import pc from 'picocolors';
 import { TEMPLATE_URL } from '#/constants';
 import { create } from '#/create';
 import { type CreateOptions, cli, confirmChoice, showWelcome } from '#/modules/cli';
-import { detectUsedPorts, findNextOffset } from '#/utils/detect-used-ports';
+import { detectUsedPorts, findNextAppIndex, isAppIndex } from '#/utils/detect-used-ports';
 import { fetchLatestCommit, fetchLatestRelease } from '#/utils/fetch-template-metadata';
 import { isEmptyDirectory } from '#/utils/is-empty-directory';
 import { validateProjectName } from '#/utils/validate-project-name';
@@ -72,9 +72,9 @@ async function main(): Promise<void> {
     }
   }
 
-  // Scan sibling directories and prompt for port offset
-  const portOffset = cli.options.portOffset ?? (await promptPortOffset(targetFolder, promptTheme, promptContext));
-  confirmChoice('Port offset', formatOffset(portOffset));
+  // Scan sibling directories and prompt for the app index
+  const appIndex = cli.options.appIndex ?? (await promptAppIndex(targetFolder, promptTheme, promptContext));
+  confirmChoice('App index', formatAppIndex(appIndex));
 
   // Prompt for admin email. Default uses the reserved `example.com` domain (RFC 2606) so the
   // seed address can never resolve or route real mail — it's a placeholder, not a real inbox.
@@ -97,7 +97,7 @@ async function main(): Promise<void> {
     packageManager: cli.packageManager,
     templateUrl: cli.options.template,
     templateRef,
-    portOffset,
+    appIndex,
     adminEmail,
   };
 
@@ -170,23 +170,23 @@ async function promptTemplateRef(theme: object, context: object): Promise<string
   return 'main';
 }
 
-/** Format an offset as a port overview string, e.g. "10 → :3010 / :4010 / :5442" */
-function formatOffset(o: number, suffix = ''): string {
-  return `${o} → :${3000 + o} / :${4000 + o} / :${5432 + o}${suffix}`;
+/** Format an app index as a port overview string, e.g. "1 → :3001 / :4010 / :5442" */
+function formatAppIndex(i: number, suffix = ''): string {
+  return `${i} → :${3000 + i} / :${4000 + i * 10} / :${5432 + i * 10}${suffix}`;
 }
 
-/** Scan sibling forks and prompt the user to pick a port offset */
-async function promptPortOffset(targetFolder: string, theme: object, context: object): Promise<number> {
+/** Scan sibling apps and prompt the user to pick an app index */
+async function promptAppIndex(targetFolder: string, theme: object, context: object): Promise<number> {
   const usedPorts = await detectUsedPorts(targetFolder);
-  const suggested = findNextOffset(usedPorts);
+  const suggested = findNextAppIndex(usedPorts);
 
   // Fold a compact hint into the prompt message itself so it's wiped by clearPromptOnDone
-  // once an offset is chosen — no leftover "Detected forks" trail. Override the default
-  // message style (which bolds everything) so only the "Port offset" title is bold.
-  let message = `${pc.bold('Port offset')} ${pc.dim('· to avoid conflicts with other forks/clones')}`;
+  // once an index is chosen — no leftover "Detected forks" trail. Override the default
+  // message style (which bolds everything) so only the "App index" title is bold.
+  let message = `${pc.bold('App index')} ${pc.dim('· to avoid port conflicts with other apps on this machine')}`;
   if (usedPorts.length > 0) {
     const count = usedPorts.length;
-    message += pc.dim(`\nDetected ${count} sibling fork${count === 1 ? '' : 's'} · suggested offset ${suggested}`);
+    message += pc.dim(`\nDetected ${count} sibling fork${count === 1 ? '' : 's'} · suggested index ${suggested}`);
   }
   const portTheme = {
     ...(theme as Record<string, unknown>),
@@ -195,16 +195,16 @@ async function promptPortOffset(targetFolder: string, theme: object, context: ob
 
   // Presets exclude 0 (always offered as the explicit default below) and the suggested
   // value (offered first) to avoid duplicate choices.
-  const presets = [10, 20, 30].filter((o) => o !== suggested);
+  const presets = [1, 2, 3].filter((i) => i !== suggested);
   const choice = await select(
     {
       message,
       theme: portTheme,
       choices: [
-        ...(suggested > 0 ? [{ name: formatOffset(suggested, ' (suggested)'), value: suggested }] : []),
-        { name: formatOffset(0, ' (default)'), value: 0 },
-        ...presets.map((o) => ({ name: formatOffset(o), value: o })),
-        { name: 'Custom offset', value: -1 },
+        ...(suggested > 0 ? [{ name: formatAppIndex(suggested, ' (suggested)'), value: suggested }] : []),
+        { name: formatAppIndex(0, ' (default)'), value: 0 },
+        ...presets.map((i) => ({ name: formatAppIndex(i), value: i })),
+        { name: 'Custom index', value: -1 },
       ],
     },
     context,
@@ -214,15 +214,10 @@ async function promptPortOffset(targetFolder: string, theme: object, context: ob
 
   const custom = await input(
     {
-      message: 'Enter custom offset (0-490, multiples of 10)',
+      message: 'Enter custom index (0-9, not 4)',
       default: String(suggested),
       theme,
-      validate: (val) => {
-        const n = Number(val);
-        if (Number.isNaN(n) || n < 0 || n > 490) return 'Must be between 0 and 490';
-        if (n % 10 !== 0) return 'Must be a multiple of 10';
-        return true;
-      },
+      validate: (val) => (isAppIndex(Number(val)) ? true : 'Must be a whole number from 0 to 9, not 4'),
     },
     context,
   );

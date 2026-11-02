@@ -96,19 +96,15 @@ export async function generateEnvFromExample(
  * The backend `.env` is the single source of truth for the project slug, database
  * ports (consumed by `backend/compose.yaml`), connection URLs and admin email.
  * Service ports deliberately do NOT live here: they come from `devPorts` in
- * `config.development.ts`, and a stale `PORT=` env line would silently override
- * the fork's offset (the pre-devPorts collision failure mode).
+ * shared config, and a stale `PORT=` env line would silently override the app's
+ * `devAppIndex` (the pre-devPorts collision failure mode).
  */
-export function getBackendEnvReplacements(
-  slug: string,
-  adminEmail: string,
-  portOffset: number,
-): Record<string, string> {
-  const db = 5432 + portOffset;
+export function getBackendEnvReplacements(slug: string, adminEmail: string, appIndex: number): Record<string, string> {
+  const db = 5432 + appIndex * 10;
   return {
     PROJECT_SLUG: slug,
     DB_PORT: String(db),
-    DB_TEST_PORT: String(5434 + portOffset),
+    DB_TEST_PORT: String(5434 + appIndex * 10),
     DATABASE_URL: `postgres://runtime_role:dev_password@0.0.0.0:${db}/postgres`,
     DATABASE_ADMIN_URL: `postgres://postgres:postgres@0.0.0.0:${db}/postgres`,
     DATABASE_CDC_URL: `postgres://admin_role:dev_password@0.0.0.0:${db}/postgres`,
@@ -116,49 +112,39 @@ export function getBackendEnvReplacements(
   };
 }
 
+/** Set the app's number in the source of `config.default.ts`; a template without the key can only give index 0. */
+export function setDevAppIndex(source: string, appIndex: number): string {
+  const pattern = /^(\s*devAppIndex:\s*)\d+/m;
+  if (appIndex !== 0 && !pattern.test(source)) {
+    throw new Error('This template has no devAppIndex in its config: use app index 0, or a newer template.');
+  }
+  return source.replace(pattern, (_, head: string) => `${head}${appIndex}`);
+}
+
 /**
  * Generate env config files with project-specific values.
  * All configs go through the same data-driven loop.
  * Values prefixed with '=' are emitted as raw TS expressions (not quoted).
  */
-export function generateEnvConfigs(slug: string, name: string, portOffset: number): Record<string, string> {
-  const fe = 3000 + portOffset;
-  const api = 4000 + portOffset;
-  // Every devPorts key, offset as one block: a key left out keeps its default port and
-  // collides with another local stack (the config merge keeps unlisted keys).
-  const devPorts = {
-    frontend: fe,
-    api,
-    cdcHealth: api + 1,
-    yjs: api + 2,
-    mcp: api + 3,
-    oauth: api + 4,
-    internal: api + 5,
-    jobs: api + 6,
-  };
-  const devPortsExpression = Object.entries(devPorts)
-    .map(([key, port]) => `${key}: ${port}`)
-    .join(', ');
-
+export function generateEnvConfigs(slug: string, name: string): Record<string, string> {
   const header =
     "import type { DeepPartial } from '../src/config-builder/types.ts';\nimport type { config as _default } from './config.default.ts';\n";
 
   // Per-environment specs: optional imports + object props (= prefix → raw TS expression).
   // URL shapes are same-origin (the Vite dev server / public origin proxies /api, /yjs,
-  // /mcp and /oauth), mirroring cella's own config.<mode>.ts files. Service listen ports come
-  // from `devPorts`, offset per fork so parallel local stacks never collide on :4000.
+  // /mcp and /oauth), mirroring cella's own config.<mode>.ts files. The URLs carry app number 0's
+  // port: `devAppIndex` in config.default.ts moves them and `devPorts` when the config builds.
   const envs: Record<string, { imports?: string; props: Record<string, string | boolean> }> = {
     development: {
       props: {
         slug: `${slug}-development`,
         domain: '',
-        frontendUrl: `http://localhost:${fe}`,
-        backendUrl: `http://localhost:${fe}/api`,
-        backendAuthUrl: `http://localhost:${fe}/api/auth`,
-        yjsUrl: `ws://localhost:${fe}/yjs`,
-        mcpUrl: `http://localhost:${fe}/mcp`,
-        oauthUrl: `http://localhost:${fe}/oauth`,
-        devPorts: `={ ${devPortsExpression} }`,
+        frontendUrl: 'http://localhost:3000',
+        backendUrl: 'http://localhost:3000/api',
+        backendAuthUrl: 'http://localhost:3000/api/auth',
+        yjsUrl: 'ws://localhost:3000/yjs',
+        mcpUrl: 'http://localhost:3000/mcp',
+        oauthUrl: 'http://localhost:3000/oauth',
         // The template's shared development buckets hold the seed files and the GeoIP databases,
         // so seeded attachments render before the app has storage of its own.
         s3: "={ region: 'nl-ams', host: 's3.nl-ams.scw.cloud', publicBucket: 'cella-shared-public', privateBucket: 'cella-shared-private' }",

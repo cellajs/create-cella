@@ -1,18 +1,15 @@
 import { basename, resolve } from 'node:path';
 import { Command, InvalidArgumentError } from 'commander';
 import { NAME, VERSION } from '#/constants';
+import { isAppIndex } from '#/utils/detect-used-ports';
 import { validateProjectName } from '#/utils/validate-project-name';
 import type { CLIConfig, CLIOptions } from './types';
 
-function parsePortOffset(value: string): number {
+function parseAppIndex(value: string): number {
   const parsed = Number(value);
 
-  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 490) {
-    throw new InvalidArgumentError('Port offset must be an integer between 0 and 490');
-  }
-
-  if (parsed % 10 !== 0) {
-    throw new InvalidArgumentError('Port offset must be a multiple of 10');
+  if (!isAppIndex(parsed)) {
+    throw new InvalidArgumentError('App index must be a whole number from 0 to 9, not 4');
   }
 
   return parsed;
@@ -32,7 +29,7 @@ export const command = new Command(NAME)
   .usage('[directory] [options]')
   .helpOption('-h, --help', 'display this help message')
   .option('--template <path>', 'use a custom template (local path or github:user/repo)')
-  .option('--port-offset <number>', 'set the port offset (0-490 in steps of 10)', parsePortOffset)
+  .option('--app-index <number>', "set this app's number for its dev ports (0-9, not 4)", parseAppIndex)
   .option('--admin-email <email>', 'set the admin email for the initial seed user')
   .action((name: string) => {
     const trimmedName = typeof name === 'string' ? name.trim() : name;

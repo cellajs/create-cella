@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { generateEnvConfigs, generateEnvFromExample, getBackendEnvReplacements } from '#/constants';
+import { generateEnvConfigs, generateEnvFromExample, getBackendEnvReplacements, setDevAppIndex } from '#/constants';
 
 /**
  * Fast unit tests for the env generation helpers.
@@ -22,13 +22,13 @@ describe('getBackendEnvReplacements', () => {
     expect(r.DATABASE_CDC_URL).toContain('@0.0.0.0:5432/');
   });
 
-  it('applies the port offset to db ports and never emits PORT (devPorts governs services)', () => {
-    const r = getBackendEnvReplacements('my-app', 'admin@my-app.example.com', 10);
+  it('applies the app index to db ports and never emits PORT (devPorts governs services)', () => {
+    const r = getBackendEnvReplacements('my-app', 'admin@my-app.example.com', 1);
 
     expect(r.DB_PORT).toBe('5442');
     expect(r.DB_TEST_PORT).toBe('5444');
     expect(r.DATABASE_URL).toContain('@0.0.0.0:5442/');
-    // A PORT= env line would silently override the config offset
+    // A PORT= env line would silently override devAppIndex
     expect(r.PORT).toBeUndefined();
   });
 });
@@ -63,7 +63,7 @@ describe('generateEnvFromExample', () => {
 });
 
 describe('generateEnvConfigs', () => {
-  const configs = generateEnvConfigs('my-app', 'My App', 0);
+  const configs = generateEnvConfigs('my-app', 'My App');
 
   it('generates a file for every environment', () => {
     for (const mode of ['development', 'staging', 'tunnel', 'test', 'production']) {
@@ -93,7 +93,7 @@ describe('generateEnvConfigs', () => {
     }
   });
 
-  it('bakes project-specific values, same-origin urls and devPorts into development', () => {
+  it('bakes project-specific values and same-origin urls into development', () => {
     const dev = configs['./shared/config/config.development.ts'];
     expect(dev).toContain("mode: 'development'");
     expect(dev).toContain("name: 'My App DEVELOPMENT'");
@@ -105,9 +105,8 @@ describe('generateEnvConfigs', () => {
     expect(dev).toContain("yjsUrl: 'ws://localhost:3000/yjs'");
     expect(dev).toContain("mcpUrl: 'http://localhost:3000/mcp'");
     expect(dev).toContain("oauthUrl: 'http://localhost:3000/oauth'");
-    expect(dev).toContain(
-      'devPorts: { frontend: 3000, api: 4000, cdcHealth: 4001, yjs: 4002, mcp: 4003, oauth: 4004, internal: 4005, jobs: 4006 }',
-    );
+    // devAppIndex moves these and devPorts when the config builds
+    expect(dev).not.toContain('devPorts');
   });
 
   it('points development at the shared development buckets, and no other mode', () => {
@@ -134,14 +133,15 @@ describe('generateEnvConfigs', () => {
     expect(prod).toContain('satisfies DeepPartial<typeof _default>');
     expect(prod).not.toContain('name:');
   });
+});
 
-  it('applies the port offset to the frontend url and devPorts together', () => {
-    const offset = generateEnvConfigs('my-app', 'My App', 10);
-    const dev = offset['./shared/config/config.development.ts'];
-    expect(dev).toContain("frontendUrl: 'http://localhost:3010'");
-    expect(dev).toContain("backendUrl: 'http://localhost:3010/api'");
-    expect(dev).toContain(
-      'devPorts: { frontend: 3010, api: 4010, cdcHealth: 4011, yjs: 4012, mcp: 4013, oauth: 4014, internal: 4015, jobs: 4016 }',
-    );
+describe('setDevAppIndex', () => {
+  it('sets the number in the template config', () => {
+    expect(setDevAppIndex('  devAppIndex: 0,\n  devPorts: {},\n', 2)).toBe('  devAppIndex: 2,\n  devPorts: {},\n');
+  });
+
+  it('refuses a number the template has no key for, and accepts index 0 there', () => {
+    expect(() => setDevAppIndex('  devPorts: {},\n', 2)).toThrow('no devAppIndex');
+    expect(setDevAppIndex('  devPorts: {},\n', 0)).toBe('  devPorts: {},\n');
   });
 });
