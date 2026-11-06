@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/cellajs/create-cella/compare/create-cella-0.4.0...create-cella-0.4.1) (2026-11-06)
+
+
+### 🐞 Bug fixes
+
+* the scaffold checks pass once cella moves its translations into shared ([#46](https://github.com/cellajs/create-cella/issues/46)) ([f0a618b](https://github.com/cellajs/create-cella/commit/f0a618be58dec075c35668abfbc459d73ded892c))
+
 ## [0.4.0](https://github.com/cellajs/create-cella/compare/create-cella-0.3.12...create-cella-0.4.0) (2026-11-02)
 
 
