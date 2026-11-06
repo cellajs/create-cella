@@ -55,6 +55,13 @@ describe('detectUsedPorts', () => {
       threeThousand,
       `export const config = {\n  devAppIndex: 6,\n  ${templatePorts}\n};\n`,
     );
+    // The origin and the service ports, as the template has them, moved by devAppIndex
+    writeFork(
+      parent,
+      'fork-services',
+      "export const development = {\n  origin: 'http://localhost:3000',\n};\n",
+      'export const config = {\n  devAppIndex: 2,\n  services: {\n    frontend: { enabled: true, port: 3000 },\n    backend: { enabled: true, port: 4000, internalPort: 4005 },\n  },\n};\n',
+    );
     // Literal ports in both files, as raak has them: frontend on +1, services on +10
     writeFork(
       parent,
@@ -80,6 +87,7 @@ describe('detectUsedPorts', () => {
     // No devPorts and no port in backendUrl: assume the paired service port
     expect(byProject['fork-sameorigin-bare']).toMatchObject({ frontend: 3030, backend: 4030 });
     expect(byProject['fork-index']).toMatchObject({ frontend: 3006, backend: 4060 });
+    expect(byProject['fork-services']).toMatchObject({ frontend: 3002, backend: 4020 });
     expect(byProject['fork-literal-default']).toMatchObject({ frontend: 3001, backend: 4010 });
     expect(byProject['unrelated-dir']).toBeUndefined();
   });

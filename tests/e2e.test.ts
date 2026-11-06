@@ -66,19 +66,13 @@ describe('create-cella e2e', () => {
       expect(existsSync(join(targetFolder, '.env'))).toBe(false);
     });
 
-    it('should have backend .env with project slug, ports and admin email', () => {
+    it('should have backend .env with the admin email and no port: ports follow the shared config', () => {
       const envPath = join(targetFolder, 'backend', '.env');
       expect(existsSync(envPath)).toBe(true);
 
       const content = readFileSync(envPath, 'utf-8');
-      // Docker compose variables (backend/.env is the single source of truth)
-      expect(content).toContain(`PROJECT_SLUG=${projectName}`);
-      expect(content).toContain('DB_PORT=5432');
-      expect(content).toContain('DB_TEST_PORT=5434');
-      // Backend runtime values
       expect(content).toContain(`ADMIN_EMAIL=admin@${projectName}.example.com`);
-      expect(content).toContain('PORT=4000');
-      expect(content).toContain('@0.0.0.0:5432/');
+      expect(content).not.toMatch(/^(PROJECT_SLUG|DB_PORT|DB_TEST_PORT|PORT)=/m);
     });
 
     it('should have frontend .env file', () => {

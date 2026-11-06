@@ -3,7 +3,6 @@ import path from 'node:path';
 import pc from 'picocolors';
 import {
   AGENT_FILES,
-  generateEnvConfigs,
   generateEnvFromExample,
   getBackendEnvReplacements,
   INITIAL_VERSION,
@@ -63,25 +62,15 @@ export async function cleanTemplate({
         // Drop the template's own list of downstream repos from the sync config
         await removeTemplateForks(targetFolder);
 
-        // Generate backend .env from backend/.env.example.
-        // The backend .env is the single source of truth for the project slug and DB ports
-        // (consumed by backend/compose.yaml). There is no root .env.
-        const backendReplacements = getBackendEnvReplacements(projectName, adminEmail, appIndex);
+        // Generate backend .env from backend/.env.example. There is no root .env. The mode configs
+        // (config.development.ts and its siblings) derive from config.default.ts and stay as the template ships them.
         const backendEnv = await generateEnvFromExample(
           path.resolve(targetFolder, 'backend/.env.example'),
-          backendReplacements,
+          getBackendEnvReplacements(adminEmail),
         );
         if (backendEnv) {
           await fs.writeFile(path.resolve(targetFolder, 'backend/.env'), backendEnv, 'utf8');
         }
-
-        // Generate minimal env config files with project values baked in
-        const envConfigs = generateEnvConfigs(projectName, displayName);
-        await Promise.all(
-          Object.entries(envConfigs).map(([filePath, content]) =>
-            fs.writeFile(path.resolve(targetFolder, filePath), content, 'utf8'),
-          ),
-        );
 
         // Clean specified folder contents
         await Promise.all(

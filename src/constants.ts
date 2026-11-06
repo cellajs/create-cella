@@ -117,24 +117,11 @@ export async function generateEnvFromExample(
 }
 
 /**
- * Replacement map for `backend/.env`.
- * The backend `.env` is the single source of truth for the project slug, database
- * ports (consumed by `backend/compose.yaml`), connection URLs and admin email.
- * Service ports deliberately do NOT live here: they come from `devPorts` in
- * shared config, and a stale `PORT=` env line would silently override the app's
- * `devAppIndex` (the pre-devPorts collision failure mode).
+ * Replacement map for `backend/.env`: the seed admin alone. The database ports and URLs follow `devAppIndex` in the
+ * shared config, and the service ports come from `services` there, so no port lives in the env file.
  */
-export function getBackendEnvReplacements(slug: string, adminEmail: string, appIndex: number): Record<string, string> {
-  const db = 5432 + appIndex * 10;
-  return {
-    PROJECT_SLUG: slug,
-    DB_PORT: String(db),
-    DB_TEST_PORT: String(5434 + appIndex * 10),
-    DATABASE_URL: `postgres://runtime_role:dev_password@0.0.0.0:${db}/postgres`,
-    DATABASE_ADMIN_URL: `postgres://postgres:postgres@0.0.0.0:${db}/postgres`,
-    DATABASE_CDC_URL: `postgres://admin_role:dev_password@0.0.0.0:${db}/postgres`,
-    ADMIN_EMAIL: adminEmail,
-  };
+export function getBackendEnvReplacements(adminEmail: string): Record<string, string> {
+  return { ADMIN_EMAIL: adminEmail };
 }
 
 /** Set the app's number in the source of `config.default.ts`; a template without the key can only give index 0. */
@@ -144,95 +131,4 @@ export function setDevAppIndex(source: string, appIndex: number): string {
     throw new Error('This template has no devAppIndex in its config: use app index 0, or a newer template.');
   }
   return source.replace(pattern, (_, head: string) => `${head}${appIndex}`);
-}
-
-/**
- * Generate env config files with project-specific values.
- * All configs go through the same data-driven loop.
- * Values prefixed with '=' are emitted as raw TS expressions (not quoted).
- */
-export function generateEnvConfigs(slug: string, name: string): Record<string, string> {
-  const header =
-    "import type { DeepPartial } from '../src/config-builder/types.ts';\nimport type { config as _default } from './config.default.ts';\n";
-
-  // Per-environment specs: optional imports + object props (= prefix → raw TS expression).
-  // URL shapes are same-origin (the Vite dev server / public origin proxies /api, /yjs,
-  // /mcp and /oauth), mirroring cella's own config.<mode>.ts files. The URLs carry app number 0's
-  // port: `devAppIndex` in config.default.ts moves them and `devPorts` when the config builds.
-  const envs: Record<string, { imports?: string; props: Record<string, string | boolean> }> = {
-    development: {
-      props: {
-        slug: `${slug}-development`,
-        domain: '',
-        frontendUrl: 'http://localhost:3000',
-        backendUrl: 'http://localhost:3000/api',
-        backendAuthUrl: 'http://localhost:3000/api/auth',
-        yjsUrl: 'ws://localhost:3000/yjs',
-        mcpUrl: 'http://localhost:3000/mcp',
-        oauthUrl: 'http://localhost:3000/oauth',
-        // The template's shared development buckets hold the seed files and the GeoIP databases,
-        // so seeded attachments render before the app has storage of its own.
-        s3: "={ region: 'nl-ams', host: 's3.nl-ams.scw.cloud', publicBucket: 'cella-shared-public', privateBucket: 'cella-shared-private' }",
-      },
-    },
-    staging: {
-      props: {
-        slug: `${slug}-staging`,
-        domain: `${slug}.example.com`,
-        frontendUrl: `https://staging.${slug}.example.com`,
-        backendUrl: `https://staging.${slug}.example.com/api`,
-        backendAuthUrl: `https://staging.${slug}.example.com/api/auth`,
-        yjsUrl: `wss://staging.${slug}.example.com/yjs`,
-        mcpUrl: `https://staging.${slug}.example.com/mcp`,
-        oauthUrl: `https://staging.${slug}.example.com/oauth`,
-      },
-    },
-    tunnel: {
-      props: {
-        slug: `${slug}-tunnel`,
-        frontendUrl: `https://${slug}.ngrok.dev`,
-        backendUrl: `https://${slug}.ngrok.dev/api`,
-        backendAuthUrl: `https://${slug}.ngrok.dev/api/auth`,
-        yjsUrl: `wss://${slug}.ngrok.dev/yjs`,
-        mcpUrl: `https://${slug}.ngrok.dev/mcp`,
-        oauthUrl: `https://${slug}.ngrok.dev/oauth`,
-      },
-    },
-    test: {
-      imports: "import { development } from './config.development.ts';\n",
-      props: {
-        domain: '',
-        frontendUrl: '=development.frontendUrl',
-        backendUrl: '=development.backendUrl',
-        backendAuthUrl: '=development.backendAuthUrl',
-        yjsUrl: '=development.yjsUrl',
-        mcpUrl: '=development.mcpUrl',
-        oauthUrl: '=development.oauthUrl',
-        // The suite covers every service and signs storage URLs, as cella's own test config has it
-        services: '={ yjs: { enabled: true }, mcp: { enabled: true }, oauth: { enabled: true } }',
-        s3: '=development.s3',
-      },
-    },
-    production: { props: { maintenance: false } },
-  };
-
-  // Serialize value: '=' prefix → raw TS expression, boolean → literal, string → quoted
-  const lit = (v: string | boolean) => {
-    if (typeof v === 'boolean') return String(v);
-    if (v.startsWith('=')) return v.slice(1);
-    return `'${v}'`;
-  };
-
-  const result: Record<string, string> = {};
-
-  for (const [mode, { imports = '', props }] of Object.entries(envs)) {
-    const nameEntry = mode !== 'production' ? `  name: '${name} ${mode.toUpperCase()}',\n` : '';
-    const body = Object.entries(props)
-      .map(([k, v]) => `  ${k}: ${lit(v)},`)
-      .join('\n');
-    result[`./shared/config/config.${mode}.ts`] =
-      `${header}${imports}\nexport const ${mode} = {\n  mode: '${mode}',\n${nameEntry}${body}\n} satisfies DeepPartial<typeof _default>;\n`;
-  }
-
-  return result;
 }
