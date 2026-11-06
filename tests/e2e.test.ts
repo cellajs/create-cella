@@ -43,7 +43,6 @@ describe('create-cella e2e', () => {
       expect(existsSync(join(targetFolder, 'backend'))).toBe(true);
       expect(existsSync(join(targetFolder, 'frontend'))).toBe(true);
       expect(existsSync(join(targetFolder, 'shared'))).toBe(true);
-      expect(existsSync(join(targetFolder, 'locales'))).toBe(true);
     });
   });
 

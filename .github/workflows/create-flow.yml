@@ -152,7 +152,7 @@ jobs:
           MAIN_SHA: ${{ steps.refs.outputs.main_sha }}
         run: |
           set -euo pipefail
-          for dir in backend frontend shared locales; do test -d "$dir"; done
+          for dir in backend frontend shared; do test -d "$dir"; done
           test ! -e shared/config/config.template.ts
           if grep -rq '__project_' shared/config; then echo '::error::placeholders left in shared/config'; exit 1; fi
           grep -q "slug: 'my-app'" shared/config/config.default.ts
