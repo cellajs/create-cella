@@ -63,30 +63,19 @@ describe('release smoke', () => {
       },
     );
 
-    const backendEnvPath = join(targetFolder, 'backend', '.env');
-    const developmentConfigPath = join(targetFolder, 'shared', 'config', 'config.development.ts');
+    const envPath = join(targetFolder, '.env');
+    expect(existsSync(envPath)).toBe(true);
 
-    expect(existsSync(backendEnvPath)).toBe(true);
-    expect(existsSync(developmentConfigPath)).toBe(true);
-
-    const backendEnv = readFileSync(backendEnvPath, 'utf8');
-    const developmentConfig = readFileSync(developmentConfigPath, 'utf8');
+    const env = readFileSync(envPath, 'utf8');
     const defaultConfig = readFileSync(join(targetFolder, 'shared', 'config', 'config.default.ts'), 'utf8');
 
-    expect(backendEnv).toContain('PROJECT_SLUG=smoke-app');
-    expect(backendEnv).toContain('DB_PORT=5442');
-    expect(backendEnv).toContain('DB_TEST_PORT=5444');
-    expect(backendEnv).toContain('DATABASE_URL=postgres://runtime_role:dev_password@0.0.0.0:5442/postgres');
-    expect(backendEnv).toContain('ADMIN_EMAIL=admin@smoke-app.com');
-    // Service ports come from devPorts; a PORT= line would override devAppIndex.
-    expect(backendEnv).not.toMatch(/^PORT=/m);
+    expect(env).toContain('ADMIN_EMAIL=admin@smoke-app.com');
+    // Every port follows devAppIndex in the shared config; a line here would override it.
+    expect(env).not.toMatch(/^(PROJECT_SLUG|DB_PORT|DB_TEST_PORT|PORT)=/m);
 
-    expect(developmentConfig).toContain("slug: 'smoke-app-development'");
-    expect(developmentConfig).toContain("frontendUrl: 'http://localhost:3000'");
-    expect(developmentConfig).toContain("backendUrl: 'http://localhost:3000/api'");
-    expect(developmentConfig).toContain("backendAuthUrl: 'http://localhost:3000/api/auth'");
+    expect(defaultConfig).toContain("slug: 'smoke-app'");
     expect(defaultConfig).toContain('devAppIndex: 1');
-    expect(developmentConfig).toContain("publicBucket: 'cella-shared-public'");
+    expect(existsSync(join(targetFolder, 'shared', 'config', 'config.development.ts'))).toBe(true);
 
     // The template's own list of downstream repos is gone from the app's sync config
     expect(readFileSync(join(targetFolder, 'cella', 'cella.config.ts'), 'utf8')).not.toContain('forks:');
