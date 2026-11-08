@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0](https://github.com/cellajs/create-cella/compare/create-cella-0.4.0...create-cella-0.5.0) (2026-11-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* generate no mode configs, backend env holds only the seed admin ([#45](https://github.com/cellajs/create-cella/issues/45))
+
+### 🎉 New features
+
+* generate no mode configs, backend env holds only the seed admin ([#45](https://github.com/cellajs/create-cella/issues/45)) ([8739b7d](https://github.com/cellajs/create-cella/commit/8739b7d332b5e940578a580927b445a7850a6b54))
+
+
+### 🐞 Bug fixes
+
+* the publish and the nightly expect what a new app now gets ([#49](https://github.com/cellajs/create-cella/issues/49)) ([699e731](https://github.com/cellajs/create-cella/commit/699e7316c83d2a7f1a6f3dc2c16a82b16d53984f))
+* the scaffold checks pass once cella moves its translations into shared ([#46](https://github.com/cellajs/create-cella/issues/46)) ([f0a618b](https://github.com/cellajs/create-cella/commit/f0a618be58dec075c35668abfbc459d73ded892c))
+* write a new app's .env where the template keeps its example ([#48](https://github.com/cellajs/create-cella/issues/48)) ([237ebb7](https://github.com/cellajs/create-cella/commit/237ebb73742c4043d4c010805a8b64675c2f69be))
+
 ## [0.4.0](https://github.com/cellajs/create-cella/compare/create-cella-0.3.12...create-cella-0.4.0) (2026-11-02)
 
 
