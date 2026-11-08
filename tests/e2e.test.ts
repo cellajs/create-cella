@@ -61,16 +61,14 @@ describe('create-cella e2e', () => {
   });
 
   describe('.env files', () => {
-    it('should not have a root .env file', () => {
-      // The root .env was removed; backend/.env is now the single source of truth.
-      expect(existsSync(join(targetFolder, '.env'))).toBe(false);
-    });
+    it('should have one .env with the admin email and no port: ports follow the shared config', () => {
+      // At the repo root, or in backend/ for a template from before that move.
+      const envPath = [join(targetFolder, '.env'), join(targetFolder, 'backend', '.env')].find((path) =>
+        existsSync(path),
+      );
+      expect(envPath).toBeDefined();
 
-    it('should have backend .env with the admin email and no port: ports follow the shared config', () => {
-      const envPath = join(targetFolder, 'backend', '.env');
-      expect(existsSync(envPath)).toBe(true);
-
-      const content = readFileSync(envPath, 'utf-8');
+      const content = readFileSync(envPath ?? '', 'utf-8');
       expect(content).toContain(`ADMIN_EMAIL=admin@${projectName}.example.com`);
       expect(content).not.toMatch(/^(PROJECT_SLUG|DB_PORT|DB_TEST_PORT|PORT)=/m);
     });

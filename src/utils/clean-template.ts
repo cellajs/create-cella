@@ -62,14 +62,15 @@ export async function cleanTemplate({
         // Drop the template's own list of downstream repos from the sync config
         await removeTemplateForks(targetFolder);
 
-        // Generate backend .env from backend/.env.example. There is no root .env. The mode configs
-        // (config.development.ts and its siblings) derive from config.default.ts and stay as the template ships them.
-        const backendEnv = await generateEnvFromExample(
-          path.resolve(targetFolder, 'backend/.env.example'),
-          getBackendEnvReplacements(adminEmail),
-        );
-        if (backendEnv) {
-          await fs.writeFile(path.resolve(targetFolder, 'backend/.env'), backendEnv, 'utf8');
+        // Generate the app's .env from the template's .env.example: at the repo root, or in backend/ for a template from
+        // before that move. The mode configs (config.development.ts and its siblings) derive from config.default.ts and
+        // stay as the template ships them.
+        const replacements = getBackendEnvReplacements(adminEmail);
+        const rootEnv = await generateEnvFromExample(path.resolve(targetFolder, '.env.example'), replacements);
+        const appEnv =
+          rootEnv ?? (await generateEnvFromExample(path.resolve(targetFolder, 'backend/.env.example'), replacements));
+        if (appEnv) {
+          await fs.writeFile(path.resolve(targetFolder, rootEnv ? '.env' : 'backend/.env'), appEnv, 'utf8');
         }
 
         // Clean specified folder contents

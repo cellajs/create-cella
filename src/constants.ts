@@ -117,7 +117,7 @@ export async function generateEnvFromExample(
 }
 
 /**
- * Replacement map for `backend/.env`: the seed admin alone. The database ports and URLs follow `devAppIndex` in the
+ * Replacement map for the app's `.env`: the seed admin alone. The database ports and URLs follow `devAppIndex` in the
  * shared config, and the service ports come from `services` there, so no port lives in the env file.
  */
 export function getBackendEnvReplacements(adminEmail: string): Record<string, string> {
