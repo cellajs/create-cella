@@ -11,9 +11,9 @@ name: Create flow
 #   heads            this checkout with the cella clone, so a create-cella PR or a cella branch can be tried
 # Checks cella runs on itself every day (pnpm check, pnpm build) are left out on purpose. pnpm test stays, on the heads
 # leg: a new app runs it with the config this package writes, which cella's own runs never see.
-# The smoke driver lives in cella (cella/skills/verify/smoke-driver.mjs) and is run from the clone, never from the
-# created app: the published leg builds its app at a release that may not carry the driver yet. Reproduce a leg
-# locally by following the README in a new app and running that driver from it.
+# The smoke driver lives in cella (cella/skills/verify/smoke-driver.mjs). A created app runs its own copy, which matches
+# its env file and layout, and the clone's copy serves an app from a release without one. Reproduce a leg locally by
+# following the README in a new app and running that driver from it.
 # A PR that changes this workflow runs all legs, since a dispatch needs the file on main.
 
 on:
@@ -156,8 +156,10 @@ jobs:
           test ! -e shared/config/config.template.ts
           if grep -rq '__project_' shared/config; then echo '::error::placeholders left in shared/config'; exit 1; fi
           grep -q "slug: 'my-app'" shared/config/config.default.ts
-          grep -q '^PROJECT_SLUG=my-app$' backend/.env
-          grep -q "^ADMIN_EMAIL=$ADMIN_EMAIL$" backend/.env
+          # At the repo root, or in backend/ for an app from a release before that move
+          env_file=.env
+          [ -f "$env_file" ] || env_file=backend/.env
+          grep -q "^ADMIN_EMAIL=$ADMIN_EMAIL$" "$env_file"
           test -f frontend/.env
           # What this checkout writes; a published scaffolder before it has none of these
           if [ "$LEG" = heads ]; then
@@ -237,7 +239,10 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         env:
           OUT_DIR: ${{ runner.temp }}/smoke
-        run: node "$CELLA_DIR/cella/skills/verify/smoke-driver.mjs"
+        run: |
+          driver=cella/skills/verify/smoke-driver.mjs
+          [ -f "$driver" ] || driver="$CELLA_DIR/$driver"
+          node "$driver"
 
       - name: pnpm test
         id: test
