@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.6.0](https://github.com/cellajs/create-cella/compare/create-cella-0.5.1...create-cella-0.6.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* a template needs `cella/create-cella.json`, which cella has in every release after 0.47.1 (cellajs/cella#1839); a template without one is refused with one message.
+* a local `--template` path must be a git checkout, and a new app from one records its `Cella-Base`, as a remote clone does.
+
+### 🎉 New features
+
+* the template's manifest names every path a new app changes ([6ba71b5](https://github.com/cellajs/create-cella/commit/6ba71b57ae00083959b2ab46d794f8de0a56995d))
+
+
+### 🐞 Bug fixes
+
+* refuse a non-empty folder, check the name by the template's rule, and clean up after a failure ([#53](https://github.com/cellajs/create-cella/issues/53)) ([03e47d6](https://github.com/cellajs/create-cella/commit/03e47d627fb1df771d6ad79f63691dc3ad4058a6))
+* the busy-port check covers Drizzle Studio's port ([6ba71b5](https://github.com/cellajs/create-cella/commit/6ba71b57ae00083959b2ab46d794f8de0a56995d))
+
+
+### 🔧 Small improvements
+
+* eight flat files with the stages in order, three dependencies, one port formula ([6ba71b5](https://github.com/cellajs/create-cella/commit/6ba71b57ae00083959b2ab46d794f8de0a56995d))
+
 ## [0.5.1](https://github.com/cellajs/create-cella/compare/create-cella-0.5.0...create-cella-0.5.1) (2026-11-13)
 
 
