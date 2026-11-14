@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/cellajs/create-cella/compare/create-cella-0.5.1...create-cella-0.5.2) (2026-11-14)
+
+
+### 🐞 Bug fixes
+
+* refuse a non-empty folder, check the name by the template's rule, and clean up after a failure ([#53](https://github.com/cellajs/create-cella/issues/53)) ([03e47d6](https://github.com/cellajs/create-cella/commit/03e47d627fb1df771d6ad79f63691dc3ad4058a6))
+
 ## [0.5.1](https://github.com/cellajs/create-cella/compare/create-cella-0.5.0...create-cella-0.5.1) (2026-11-13)
 
 
