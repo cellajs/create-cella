@@ -19,10 +19,7 @@
     "noEmit": true,
     "declaration": true,
     "composite": false,
-    "types": ["node"],
-    "paths": {
-      "#/*": ["./src/*"]
-    }
+    "types": ["node"]
   },
   "include": ["src", "tests", "index.js", "tsdown.config.ts"]
 }

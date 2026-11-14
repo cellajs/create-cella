@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stripForks } from '#/utils/clean-template';
+import { stripForks } from '../src/app-files';
 
 const withForks = `export default defineConfig({
   settings: {

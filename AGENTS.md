@@ -1,6 +1,8 @@
 # Agent guidelines (AGENTS.md)
 
-`@cellajs/create-cella`, which scaffolds a new app from the [cella template](https://github.com/cellajs/cella). The [README](./README.md) lists its options.
+`@cellajs/create-cella`, which creates a new app from the [cella template](https://github.com/cellajs/cella). The [README](./README.md) lists its options.
+
+The template's coding rules apply here too: [Style & naming](https://github.com/cellajs/cella/blob/main/cella/AGENTS.md#style--naming) and [Testing](https://github.com/cellajs/cella/blob/main/cella/AGENTS.md#testing).
 
 ## Commits & PRs
 

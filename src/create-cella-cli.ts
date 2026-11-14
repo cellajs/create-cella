@@ -1,90 +1,84 @@
 #!/usr/bin/env tsx
 
-import { existsSync } from 'node:fs';
-import { readdir } from 'node:fs/promises';
-import { basename, resolve } from 'node:path';
-import { input, select } from '@inquirer/prompts';
-import pc from 'picocolors';
-import { TEMPLATE_URL } from '#/constants';
-import { create } from '#/create';
-import { type CreateOptions, cli, confirmChoice, showWelcome } from '#/modules/cli';
-import { findBusyPorts } from '#/utils/busy-ports';
-import { detectUsedPorts, findNextAppIndex, isAppIndex } from '#/utils/detect-used-ports';
-import { fetchLatestCommit, fetchLatestRelease } from '#/utils/fetch-template-metadata';
-import { appSlugRule, isAppSlug } from '#/utils/is-app-slug';
-import { isEmail } from '#/utils/is-email';
+import { mkdir, readdir, rm } from 'node:fs/promises';
+import { basename, join, resolve } from 'node:path';
+import { Command, InvalidArgumentError } from 'commander';
+import { appSlugRule, askAnswers, type Flags, isAppSlug, isEmail } from './answers';
+import { writeAppFiles } from './app-files';
+import { makeRepository } from './app-repo';
+import pc from './colors';
+import { appIndexRule, isAppIndex } from './dev-ports';
+import { cliName, cliVersion, showBanner, showNextSteps, step, stopSpinner, warn } from './display';
+import { getTemplate } from './template';
+
+function parseFlags(): Flags {
+  const program = new Command(cliName)
+    .version(cliVersion, '-v, --version', `output the current version of ${cliName}`)
+    .argument('[directory]', 'the directory name for the new app')
+    .usage('[directory] [options]')
+    .helpOption('-h, --help', 'display this help message')
+    .option('--template <path>', 'use a custom template (local git checkout or github:user/repo)')
+    .option('--app-index <number>', `set this app's number for its dev ports, ${appIndexRule}`, (value) => {
+      if (!isAppIndex(Number(value))) throw new InvalidArgumentError(`App index must be ${appIndexRule}`);
+      return Number(value);
+    })
+    .option('--admin-email <email>', 'set the admin email for the initial seed user', (value) => {
+      if (!isEmail(value)) throw new InvalidArgumentError('Admin email must be an address such as admin@example.com');
+      return value;
+    })
+    .parse();
+
+  const directory = program.args[0]?.trim() || undefined;
+  if (directory && !isAppSlug(basename(resolve(directory)))) {
+    program.error(`error: invalid app name "${directory}": ${appSlugRule}.`);
+  }
+  return { directory, ...program.opts<Omit<Flags, 'directory'>>() };
+}
 
 async function main(): Promise<void> {
-  // Display CLI welcome banner
-  showWelcome();
+  const flags = parseFlags();
+  showBanner();
+  const answers = await askAnswers(flags);
+  const { targetFolder } = answers;
 
-  // Shared theme to clear prompts after answering
-  const promptTheme = { prefix: '', style: { answer: (text: string) => text } };
-  const promptContext = { clearPromptOnDone: true };
-
-  // Choose which template snapshot to scaffold from: a stable release or the
-  // latest commit. Skipped when a custom --template is provided (ref doesn't apply).
-  const templateRef = cli.options.template ? undefined : await promptTemplateRef(promptTheme, promptContext);
-
-  // Prompt for project name if not provided
-  if (!cli.directory) {
-    cli.directory = await input(
-      {
-        message: 'Enter your project name',
-        default: 'my-cella-app',
-        theme: promptTheme,
-        validate: (name) => (isAppSlug(basename(resolve(name))) ? true : `Invalid project name: ${appSlugRule}`),
-      },
-      promptContext,
-    );
-  }
-
-  const targetFolder = resolve(cli.directory);
-  const projectName = basename(targetFolder);
-
-  if (existsSync(targetFolder) && (await readdir(targetFolder)).length > 0) {
-    throw new Error(`${targetFolder} is not empty: choose a new folder, or empty this one first.`);
-  }
-
-  // Scan sibling directories and prompt for the app index
-  const appIndex = cli.options.appIndex ?? (await promptAppIndex(targetFolder, promptTheme, promptContext));
-  confirmChoice('App index', formatAppIndex(appIndex));
-  const busyPorts = await findBusyPorts(appIndex);
-  if (busyPorts.length > 0) {
-    console.info(
-      `${pc.yellow('⚠')} In use on this machine: ${busyPorts.join(', ')}. Stop what holds them before pnpm docker and pnpm dev.`,
-    );
-    console.info();
-  }
-
-  // Prompt for admin email. Default uses the reserved `example.com` domain (RFC 2606) so the
-  // seed address can never resolve or route real mail — it's a placeholder, not a real inbox.
-  const adminEmail =
-    cli.options.adminEmail ??
-    (await input(
-      {
-        message: 'Admin email for initial seed user',
-        default: 'admin@example.com',
-        theme: promptTheme,
-        validate: (email) => (isEmail(email) ? true : 'Enter an address such as admin@example.com'),
-      },
-      promptContext,
-    ));
-  confirmChoice('Admin email', adminEmail);
-
-  // Proceed with the project creation
-  const createOptions: CreateOptions = {
-    projectName,
-    targetFolder,
-    packageManager: cli.packageManager,
-    templateUrl: cli.options.template,
-    templateRef,
-    appIndex,
-    adminEmail,
+  // Until the app is made, a failure or a signal removes what the run wrote
+  let undo = async () => {};
+  const onSignal = (code: number) => () => {
+    stopSpinner();
+    void undo().finally(() => process.exit(code));
   };
+  const onSigint = onSignal(130);
+  const onSigterm = onSignal(143);
+  process.once('SIGINT', onSigint).once('SIGTERM', onSigterm);
 
-  // create prints its own failure over its spinner
-  await create(createOptions).catch(() => process.exit(1));
+  let missing: string[];
+  try {
+    step('creating app folder');
+    const createdFolder = await mkdir(targetFolder, { recursive: true });
+    undo = () => removeOutput(targetFolder, createdFolder);
+    const baseCommit = await getTemplate(answers);
+    step('cleaning template');
+    missing = await writeAppFiles(answers);
+    step('initializing git');
+    await makeRepository(targetFolder, baseCommit);
+    step();
+  } catch (error) {
+    stopSpinner();
+    await undo();
+    throw error;
+  } finally {
+    process.off('SIGINT', onSigint).off('SIGTERM', onSigterm);
+  }
+
+  if (missing.length > 0) warn(`Not in the template, skipped: ${missing.join(', ')}`);
+  showNextSteps(answers);
+}
+
+/** Remove what a run wrote: the folders `mkdir` made, else everything in the target, which the run only accepts empty. */
+async function removeOutput(targetFolder: string, createdFolder: string | undefined): Promise<void> {
+  if (createdFolder) return rm(createdFolder, { recursive: true, force: true });
+  const entries = await readdir(targetFolder);
+  await Promise.all(entries.map((entry) => rm(join(targetFolder, entry), { recursive: true, force: true })));
 }
 
 main().catch((error) => {
@@ -93,121 +87,3 @@ main().catch((error) => {
   console.error(`${pc.red('✗')} ${pc.red(error instanceof Error ? error.message : String(error))}`);
   process.exit(1);
 });
-
-/**
- * Show a short intro with the two starting points (latest release and latest
- * commit, each with its date) and let the user choose which template snapshot to
- * scaffold from. Returns the template ref to check out (release tag or `main`), or
- * undefined to use the default branch (when metadata is unavailable).
- */
-async function promptTemplateRef(theme: object, context: object): Promise<string | undefined> {
-  const [release, commit] = await Promise.all([fetchLatestRelease(), fetchLatestCommit()]);
-
-  // One-sentence intro followed by the data points that are known.
-  console.info(pc.dim('This create CLI allows you to get started with cella quickly.'));
-  console.info();
-
-  if (release)
-    console.info(`  Latest release:  ${release.tag}${release.date ? ` ${pc.dim(`· ${release.date}`)}` : ''}`);
-  if (commit) {
-    console.info(`  Latest commit:  ${commit.shortSha} ${pc.dim(`· ${commit.message} · ${commit.date}`)}`);
-    // Clickable link to the exact commit on GitHub, in grey below the summary line.
-    const repo = TEMPLATE_URL.replace('github:', '');
-    console.info(`  ${pc.gray(`https://github.com/${repo}/commit/${commit.sha}`)}`);
-  }
-  if (release || commit) console.info();
-
-  // No release known (offline, or the template's tags did not answer): the app starts from the
-  // default branch, and the output says so.
-  if (!release) {
-    console.info(`${pc.yellow('⚠')} Latest release not found · using the latest commit on main`);
-    console.info();
-    return commit ? 'main' : undefined;
-  }
-
-  // No commit to offer, or no TTY to render the select on (CI, piped stdin): take the latest
-  // release, the stable and reproducible starting point.
-  if (!commit || !process.stdin.isTTY) {
-    confirmChoice('Latest release', release.tag);
-    return release.tag;
-  }
-
-  const choice = await select(
-    {
-      message: 'Choose which cella version to start from:',
-      theme,
-      choices: [
-        { name: 'Latest release', value: 'release' },
-        { name: 'Latest commit', value: 'commit' },
-      ],
-    },
-    context,
-  );
-
-  // The prompt clears itself on done, so keep the choice visible with a checkmark.
-  if (choice === 'release') {
-    confirmChoice('Latest release', release.tag);
-    return release.tag;
-  }
-  // "Latest commit" is the tip of main; check out the branch (shallow clones can't
-  // reliably fetch an arbitrary SHA over GitHub's smart-HTTP protocol).
-  confirmChoice('Latest commit', commit.shortSha);
-  return 'main';
-}
-
-/** Format an app index as a port overview string, e.g. "1 → :3001 / :4010 / :5442" */
-function formatAppIndex(i: number, suffix = ''): string {
-  return `${i} → :${3000 + i} / :${4000 + i * 10} / :${5432 + i * 10}${suffix}`;
-}
-
-/** Scan sibling apps and prompt the user to pick an app index */
-async function promptAppIndex(targetFolder: string, theme: object, context: object): Promise<number> {
-  const usedPorts = await detectUsedPorts(targetFolder);
-  const presets = [1, 2, 3];
-  const busy = new Map(await Promise.all([0, ...presets].map(async (i) => [i, await findBusyPorts(i)] as const)));
-  const isBusy = (i: number) => (busy.get(i)?.length ?? 0) > 0;
-  const suggested = findNextAppIndex(usedPorts, isBusy);
-  const label = (i: number, note = '') => formatAppIndex(i, isBusy(i) ? ` (port ${busy.get(i)?.[0]} in use)` : note);
-
-  // Fold a compact hint into the prompt message itself so it's wiped by clearPromptOnDone
-  // once an index is chosen — no leftover "Detected forks" trail. Override the default
-  // message style (which bolds everything) so only the "App index" title is bold.
-  let message = `${pc.bold('App index')} ${pc.dim('· to avoid port conflicts with other apps on this machine')}`;
-  if (usedPorts.length > 0) {
-    const count = usedPorts.length;
-    message += pc.dim(`\nDetected ${count} sibling app${count === 1 ? '' : 's'} · suggested index ${suggested}`);
-  }
-  const portTheme = {
-    ...(theme as Record<string, unknown>),
-    style: { ...((theme as { style?: object }).style ?? {}), message: (text: string) => text },
-  };
-
-  // Presets exclude 0 (always offered as the explicit default below) and the suggested
-  // value (offered first) to avoid duplicate choices.
-  const choice = await select(
-    {
-      message,
-      theme: portTheme,
-      choices: [
-        ...(suggested > 0 ? [{ name: formatAppIndex(suggested, ' (suggested)'), value: suggested }] : []),
-        { name: label(0, ' (default)'), value: 0 },
-        ...presets.filter((i) => i !== suggested).map((i) => ({ name: label(i), value: i })),
-        { name: 'Custom index', value: -1 },
-      ],
-    },
-    context,
-  );
-
-  if (choice !== -1) return choice;
-
-  const custom = await input(
-    {
-      message: 'Enter custom index (0-9, not 4)',
-      default: String(suggested),
-      theme,
-      validate: (val) => (isAppIndex(Number(val)) ? true : 'Must be a whole number from 0 to 9, not 4'),
-    },
-    context,
-  );
-  return Number(custom);
-}

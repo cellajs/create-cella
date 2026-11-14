@@ -1,11 +1,9 @@
 name: Create flow
 
 # The newcomer path on a new app, one step per line of the app's README (cella/QUICKSTART.md): create, install,
-# generate, docker, seed, dev, then a signed-in page smoke. Nothing else runs this scaffolder's output that far:
-# tests/e2e.test.ts and tests/release-smoke.test.ts scaffold an app and read its files, and cella's own CI never
-# sees a scaffolded app at all. The config files this package writes from its own string templates replace cella's
-# wholesale, so a change to their shape breaks `pnpm generate` or the first `pnpm dev` of a new app while both
-# repos stay green (three times in 2026-08). Three legs:
+# generate, docker, seed, dev, then a signed-in page smoke. Nothing else runs a created app that far:
+# tests/e2e.test.ts and tests/release-smoke.test.ts create an app and read its files, and cella's own CI never
+# sees a created app at all. Three legs:
 #   published        the published scaffolder with cella's latest release: what `pnpm create @cellajs/cella` gives today
 #   published-main   the published scaffolder with cella main: the "Latest commit" choice in its prompt
 #   heads            this checkout with the cella clone, so a create-cella PR or a cella branch can be tried
@@ -116,7 +114,6 @@ jobs:
 
       # Without a TTY the published scaffolder takes the latest release; the directory,
       # app index and admin email are passed so no other prompt is reached.
-      # A published scaffolder older than --app-index rejects the flag before it creates anything, so --port-offset follows.
       # pnpm serves a new version of a package a day after its publish, so the published legs can run the version before
       # npm's latest. The scaffolder's banner names the version that ran.
       - name: Create the app
@@ -129,11 +126,9 @@ jobs:
           set -euo pipefail
           case "$LEG" in
             published)
-              pnpm create @cellajs/cella my-app --app-index 0 --admin-email "$ADMIN_EMAIL" ||
-                pnpm create @cellajs/cella my-app --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
+              pnpm create @cellajs/cella my-app --app-index 0 --admin-email "$ADMIN_EMAIL" ;;
             published-main)
-              pnpm create @cellajs/cella my-app --template github:cellajs/cella --app-index 0 --admin-email "$ADMIN_EMAIL" ||
-                pnpm create @cellajs/cella my-app --template github:cellajs/cella --port-offset 0 --admin-email "$ADMIN_EMAIL" ;;
+              pnpm create @cellajs/cella my-app --template github:cellajs/cella --app-index 0 --admin-email "$ADMIN_EMAIL" ;;
             heads)
               node "$GITHUB_WORKSPACE/index.js" my-app --template "$CELLA_DIR" --app-index 0 --admin-email "$ADMIN_EMAIL" ;;
           esac 2>&1 | tee "$RUNNER_TEMP/create.log"
@@ -156,10 +151,7 @@ jobs:
           test ! -e shared/config/config.template.ts
           if grep -rq '__project_' shared/config; then echo '::error::placeholders left in shared/config'; exit 1; fi
           grep -q "slug: 'my-app'" shared/config/config.default.ts
-          # At the repo root, or in backend/ for an app from a release before that move
-          env_file=.env
-          [ -f "$env_file" ] || env_file=backend/.env
-          grep -q "^ADMIN_EMAIL=$ADMIN_EMAIL$" "$env_file"
+          grep -q "^ADMIN_EMAIL=$ADMIN_EMAIL$" .env
           test -f frontend/.env
           # What this checkout writes; a published scaffolder before it has none of these
           if [ "$LEG" = heads ]; then
@@ -186,8 +178,11 @@ jobs:
                 exit 1
               fi ;;
             heads)
-              # A local template leaves no Cella-Base trailer today
-              base="$(git -C "$CELLA_DIR" rev-parse HEAD) (cella $CELLA_REF)" ;;
+              clone_sha=$(git -C "$CELLA_DIR" rev-parse HEAD)
+              if [ "$base" != "$clone_sha" ]; then
+                echo "::error::the app is based on ${base:-no recorded commit}; the cella clone is at $clone_sha"
+                exit 1
+              fi ;;
           esac
           echo "template commit: $base"
 
@@ -250,8 +245,7 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: pnpm test
 
-      # cella's `pnpm template:check` covers the config the template itself carries, on every cella PR. This covers
-      # the files this package writes from its own string templates, which that check never sees, and their formatting.
+      # The default config this package fills in from the template's placeholder config, as a new app has it
       - name: The generated config typechecks and is formatted
         id: config
         if: always() && steps.install.outcome == 'success'

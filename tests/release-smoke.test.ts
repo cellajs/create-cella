@@ -1,22 +1,15 @@
 import { execFileSync } from 'node:child_process';
-import nodeFs, { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import nodeFs, { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import git from 'isomorphic-git';
 import { afterAll, describe, expect, it } from 'vitest';
-import packageJson from '../package.json' with { type: 'json' };
 
 /**
- * Release smoke test against the real published artifact.
- *
- * Packs the package into a tarball, installs that tarball into a throwaway dir (so the CLI's
- * own dependencies resolve from its package.json, not the workspace), then runs the installed
- * `create-cella` bin to scaffold a project from the real `github:cellajs/cella` template. This
- * proves the packed file set, the bin wiring and the dependency closure all work — things a
- * `node index.js` run from inside the repo can't catch. Gated at publish time via
- * `test:release`/`prepublishOnly` and excluded from the default `pnpm test` run.
- *
- * Requires network access to codeload.github.com.
+ * Packs this package, installs the tarball into a throwaway folder, so its dependencies resolve from its own
+ * package.json, and runs the installed bin against the real `github:cellajs/cella` template over the network. This
+ * proves the packed files, the bin and the dependency closure, which a `node index.js` run inside the repo cannot.
+ * `test:release` and `prepublishOnly` run it; the default `pnpm test` leaves it out.
  */
 describe('release smoke', () => {
   const packageRoot = resolve(import.meta.dirname, '..');
@@ -28,66 +21,26 @@ describe('release smoke', () => {
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it('packs, installs, and scaffolds via the installed bin with values propagated into env and config', async () => {
-    // 1. Pack the built package into a tarball. `--ignore-scripts` keeps the `prepare` hook
-    //    (lefthook) from writing to stdout and corrupting the `--json` output.
+  it('makes a repository whose first commit names its template commit and whose remote is cella-upstream', async () => {
+    // `--ignore-scripts` keeps the `prepare` hook (lefthook) out of the `--json` output
     const packOutput = execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', tempRoot], {
       cwd: packageRoot,
       encoding: 'utf8',
     });
-    const [packResult] = JSON.parse(packOutput) as Array<{ filename: string; name: string; version: string }>;
-    expect(packResult.name).toBe(packageJson.name);
-    expect(packResult.version).toBe(packageJson.version);
-    const tarballPath = join(tempRoot, packResult.filename);
-    expect(existsSync(tarballPath)).toBe(true);
+    const [{ filename }] = JSON.parse(packOutput) as Array<{ filename: string }>;
 
-    // 2. Install the tarball into an isolated dir so deps resolve from the package itself.
     mkdirSync(installDir);
     writeFileSync(join(installDir, 'package.json'), JSON.stringify({ name: 'smoke-installer', private: true }));
-    execFileSync('npm', ['install', tarballPath, '--no-audit', '--no-fund'], {
-      cwd: installDir,
-      encoding: 'utf8',
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    const options = { cwd: installDir, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 } as const;
+    execFileSync('npm', ['install', join(tempRoot, filename), '--no-audit', '--no-fund'], options);
 
-    // 3. Run the installed bin to scaffold from the real github template. Git steps run for
-    //    real — isomorphic-git works offline with an explicit author, so no git config needed.
     const bin = join(installDir, 'node_modules', '.bin', 'create-cella');
-    execFileSync(
-      bin,
-      [targetFolder, '--template', 'github:cellajs/cella', '--app-index', '1', '--admin-email', 'admin@smoke-app.com'],
-      {
-        cwd: installDir,
-        encoding: 'utf8',
-        maxBuffer: 10 * 1024 * 1024,
-      },
-    );
+    const args = ['--template', 'github:cellajs/cella', '--app-index', '1', '--admin-email', 'admin@smoke-app.com'];
+    execFileSync(bin, [targetFolder, ...args], options);
 
-    const envPath = join(targetFolder, '.env');
-    expect(existsSync(envPath)).toBe(true);
-
-    const env = readFileSync(envPath, 'utf8');
-    const defaultConfig = readFileSync(join(targetFolder, 'shared', 'config', 'config.default.ts'), 'utf8');
-
-    expect(env).toContain('ADMIN_EMAIL=admin@smoke-app.com');
-    // Every port follows devAppIndex in the shared config; a line here would override it.
-    expect(env).not.toMatch(/^(PROJECT_SLUG|DB_PORT|DB_TEST_PORT|PORT)=/m);
-
-    expect(defaultConfig).toContain("slug: 'smoke-app'");
-    expect(defaultConfig).toContain('devAppIndex: 1');
-    expect(existsSync(join(targetFolder, 'shared', 'config', 'config.development.ts'))).toBe(true);
-
-    // The template's own list of downstream repos is gone from the app's sync config
-    expect(readFileSync(join(targetFolder, 'cella', 'cella.config.ts'), 'utf8')).not.toContain('forks:');
-
-    // Git steps run for real now — assert the repo was initialized, the root commit carries
-    // the `Cella-Base:` provenance trailer the sync CLI bootstraps its first merge-base from,
-    // and the upstream remote was added under the name the sync CLI expects.
-    expect(existsSync(join(targetFolder, '.git'))).toBe(true);
-
+    // `pnpm cella upgrade` reads both
     const [rootCommit] = await git.log({ fs: nodeFs, dir: targetFolder, depth: 1 });
     expect(rootCommit.commit.message).toMatch(/^Cella-Base: [0-9a-f]{40}$/m);
-
     const remotes = await git.listRemotes({ fs: nodeFs, dir: targetFolder });
     expect(remotes.map((r) => r.remote)).toContain('cella-upstream');
   }, 300000);

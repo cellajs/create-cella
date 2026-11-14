@@ -1,20 +1,13 @@
-import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
-// Dedicated config for the release smoke test. It packs the tarball, installs it into a
-// temp dir, and scaffolds from the network template, so it is excluded from the default run.
+// The release smoke test alone: it packs and installs the package and clones the template over the network
 export default defineConfig({
-  resolve: {
-    alias: {
-      '#': resolve(__dirname, './src'),
-    },
-  },
   test: {
     globals: true,
     environment: 'node',
     include: ['tests/release-smoke.test.ts'],
     exclude: ['**/node_modules/**'],
-    testTimeout: 300000, // 5 minutes: pack + install + network scaffold
+    testTimeout: 300000, // 5 minutes: pack, install and a network clone
     onConsoleLog: () => false,
   },
 });
