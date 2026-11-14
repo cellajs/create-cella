@@ -10,7 +10,7 @@
         "organizeImports": {
           "level": "on",
           "options": {
-            "groups": [[":PACKAGE_WITH_PROTOCOL:", ":PACKAGE:"], ["#/**"], ":PATH:"]
+            "groups": [[":PACKAGE_WITH_PROTOCOL:", ":PACKAGE:"], ":PATH:"]
           }
         }
       }
