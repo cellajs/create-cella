@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAppSlug } from '#/utils/is-app-slug';
+import { isAppSlug } from '../src/answers';
 
 // The template refuses any slug outside this table's rule when it first loads its config
 describe('isAppSlug', () => {

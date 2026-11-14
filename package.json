@@ -14,18 +14,14 @@
   "homepage": "https://cellajs.com",
   "author": "CellaJS <info@cellajs.com>",
   "engines": {
-    "node": "26.x"
+    "node": ">=26"
   },
   "type": "module",
-  "main": "./dist/index.js",
   "files": [
     "dist",
     "index.js",
     "README.md"
   ],
-  "imports": {
-    "#/*": "./src/*"
-  },
   "bin": {
     "create-cella": "index.js"
   },
@@ -34,7 +30,7 @@
     "try": "rimraf ../cella-try-app && tsx ./src/create-cella-cli.ts ../cella-try-app",
     "clean": "rimraf ./dist",
     "build": "tsdown",
-    "test-build": "pnpm run build && node index.js",
+    "test-build": "pnpm run build && node index.js --help",
     "prepublishOnly": "pnpm run test:release",
     "check": "pnpm ts && pnpm biome check --write .",
     "ts": "tsgo --pretty",
@@ -48,10 +44,7 @@
   "dependencies": {
     "@inquirer/prompts": "^8.8.0",
     "commander": "^15.1.0",
-    "ignore": "^7.0.14",
-    "isomorphic-git": "^1.44.13",
-    "ora": "^10.0.0",
-    "picocolors": "^1.1.1"
+    "isomorphic-git": "^1.44.13"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.7",
@@ -88,6 +81,21 @@
           "style",
           "test"
         ]
+      ],
+      "header-max-length": [
+        2,
+        "always",
+        120
+      ],
+      "body-max-line-length": [
+        0,
+        "always",
+        200
+      ],
+      "footer-max-line-length": [
+        0,
+        "always",
+        200
       ]
     }
   }
