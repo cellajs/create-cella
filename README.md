@@ -7,6 +7,8 @@ CLI tool to scaffold a new Cella project from [the template](https://github.com/
 ```bash
 pnpm create @cellajs/cella my-app
 ```
+
+The directory must be new or empty, and its name becomes the app's slug: lowercase letters and digits, starting with a letter, single hyphens between parts and at least 4 characters besides hyphens. A run that fails or is interrupted removes what it wrote.
 ## CLI Options
 
 ```bash
@@ -40,7 +42,7 @@ pnpm ts
 # Lint
 pnpm lint:fix
 
-# Try it out
+# Try it out (recreates ../cella-try-app)
 pnpm try
 
 # Run tests

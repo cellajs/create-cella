@@ -42,11 +42,9 @@ export function getHeaderLine(): string {
 }
 
 // Files or folders to be removed from the template after downloading.
-// The Pulumi stack files carry cella's own bootstrap markers and encryption
-// salt; a fresh app bootstraps its own. Removing them also keeps the deploy
-// workflow's staging gate false until the app bootstraps, so a fresh scaffold
-// never auto-deploys staging on its first push to main.
-export const TO_REMOVE: string[] = ['./infra/Pulumi.production.yaml', './infra/Pulumi.staging.yaml'];
+// The Pulumi stack file carries cella's own bootstrap markers and encryption
+// salt; a fresh app bootstraps its own.
+export const TO_REMOVE: string[] = ['./infra/Pulumi.production.yaml'];
 
 // Specific folder contents to be cleaned out from the template
 export const TO_CLEAN: string[] = ['./backend/drizzle'];
