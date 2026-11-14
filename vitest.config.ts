@@ -1,19 +1,13 @@
-import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      '#': resolve(__dirname, './src'),
-    },
-  },
   test: {
     globals: true,
     environment: 'node',
-    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
-    // release-smoke packs + installs the tarball; run it only via `test:release`.
+    include: ['tests/**/*.test.ts'],
+    // release-smoke packs and installs the package: `test:release` runs it
     exclude: ['**/node_modules/**', 'tests/release-smoke.test.ts'],
-    testTimeout: 120000, // 2 minutes for E2E tests
-    onConsoleLog: () => false, // Suppress console output during tests
+    testTimeout: 120000, // 2 minutes, for the e2e clone
+    onConsoleLog: () => false,
   },
 });
