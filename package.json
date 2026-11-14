@@ -14,10 +14,9 @@
   "homepage": "https://cellajs.com",
   "author": "CellaJS <info@cellajs.com>",
   "engines": {
-    "node": "26.x"
+    "node": ">=26"
   },
   "type": "module",
-  "main": "./dist/index.js",
   "files": [
     "dist",
     "index.js",
