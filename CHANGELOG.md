@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/cellajs/create-cella/compare/create-cella-0.5.0...create-cella-0.5.1) (2026-11-13)
+
+
+### 📖 Documentation
+
+* an agents file asks a pull request that grows the code for a Size section ([#51](https://github.com/cellajs/create-cella/issues/51)) ([a00cb11](https://github.com/cellajs/create-cella/commit/a00cb114ae0f1e08a6266e82ef19ccb908a1e55e))
+
 ## [0.5.0](https://github.com/cellajs/create-cella/compare/create-cella-0.4.0...create-cella-0.5.0) (2026-11-08)
 
 
