@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import { existsSync } from 'node:fs';
-import { rm } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { input, select } from '@inquirer/prompts';
 import pc from 'picocolors';
@@ -11,9 +11,8 @@ import { type CreateOptions, cli, confirmChoice, showWelcome } from '#/modules/c
 import { findBusyPorts } from '#/utils/busy-ports';
 import { detectUsedPorts, findNextAppIndex, isAppIndex } from '#/utils/detect-used-ports';
 import { fetchLatestCommit, fetchLatestRelease } from '#/utils/fetch-template-metadata';
+import { appSlugRule, isAppSlug } from '#/utils/is-app-slug';
 import { isEmail } from '#/utils/is-email';
-import { isEmptyDirectory } from '#/utils/is-empty-directory';
-import { validateProjectName } from '#/utils/validate-project-name';
 
 async function main(): Promise<void> {
   // Display CLI welcome banner
@@ -34,44 +33,17 @@ async function main(): Promise<void> {
         message: 'Enter your project name',
         default: 'my-cella-app',
         theme: promptTheme,
-        validate: (name) => {
-          const validation = validateProjectName(basename(resolve(name)));
-          return validation.valid ? true : `Invalid project name: ${validation.problems?.[0] ?? 'unknown error'}`;
-        },
+        validate: (name) => (isAppSlug(basename(resolve(name))) ? true : `Invalid project name: ${appSlugRule}`),
       },
       promptContext,
     );
   }
 
   const targetFolder = resolve(cli.directory);
-  const projectName = basename(targetFolder)?.toLowerCase() || 'project';
+  const projectName = basename(targetFolder);
 
-  // Check if the target folder exists and is not empty
-  if (existsSync(targetFolder) && !(await isEmptyDirectory(targetFolder))) {
-    const dirName = cli.directory === '.' ? 'Current directory' : `Target directory "${targetFolder}"`;
-    const message = `${dirName} is not empty. Please choose how you would like to proceed:`;
-
-    const action = await select(
-      {
-        message,
-        theme: promptTheme,
-        choices: [
-          { name: 'Cancel and exit', value: 'cancel' },
-          { name: 'Remove existing files and continue', value: 'remove' },
-        ],
-      },
-      promptContext,
-    );
-
-    if (action === 'cancel') {
-      process.exit(1);
-    }
-
-    // Wipe the folder so the template clone starts from a clean slate. Leaving stale
-    // files behind makes the git checkout fail with conflicts on overlapping paths.
-    if (action === 'remove') {
-      await rm(targetFolder, { recursive: true, force: true });
-    }
+  if (existsSync(targetFolder) && (await readdir(targetFolder)).length > 0) {
+    throw new Error(`${targetFolder} is not empty: choose a new folder, or empty this one first.`);
   }
 
   // Scan sibling directories and prompt for the app index
@@ -111,11 +83,14 @@ async function main(): Promise<void> {
     adminEmail,
   };
 
-  await create(createOptions);
+  // create prints its own failure over its spinner
+  await create(createOptions).catch(() => process.exit(1));
 }
 
 main().catch((error) => {
-  console.error(error);
+  // Ctrl-c at a prompt. Its class lives in @inquirer/core, which is no direct dependency: match the name.
+  if (error instanceof Error && error.name === 'ExitPromptError') process.exit(130);
+  console.error(`${pc.red('✗')} ${pc.red(error instanceof Error ? error.message : String(error))}`);
   process.exit(1);
 });
 

@@ -2,8 +2,8 @@ import { basename, resolve } from 'node:path';
 import { Command, InvalidArgumentError } from 'commander';
 import { NAME, VERSION } from '#/constants';
 import { isAppIndex } from '#/utils/detect-used-ports';
+import { appSlugRule, isAppSlug } from '#/utils/is-app-slug';
 import { isEmail } from '#/utils/is-email';
-import { validateProjectName } from '#/utils/validate-project-name';
 import type { CLIConfig, CLIOptions } from './types';
 
 function parseAppIndex(value: string): number {
@@ -41,12 +41,8 @@ export const command = new Command(NAME)
     const trimmedName = typeof name === 'string' ? name.trim() : name;
 
     if (trimmedName) {
-      const validation = validateProjectName(basename(resolve(trimmedName)));
-
-      if (!validation.valid) {
-        self.error(
-          `error: invalid project name "${trimmedName}": ${validation.problems?.[0] ?? 'unknown error'}. Use lowercase letters, digits and dashes, such as my-app.`,
-        );
+      if (!isAppSlug(basename(resolve(trimmedName)))) {
+        self.error(`error: invalid project name "${trimmedName}": ${appSlugRule}.`);
       }
 
       directory = trimmedName;

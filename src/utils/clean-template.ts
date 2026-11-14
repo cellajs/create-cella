@@ -18,9 +18,20 @@ import {
 
 const warningMark = pc.yellow('⚠');
 
+/** Run `step`; a template path it reads and does not find (ENOENT) goes into `missing`, and the step is skipped. */
+async function unlessMissing(missing: string[], templatePath: string, step: () => Promise<unknown>): Promise<void> {
+  try {
+    await step();
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    missing.push(templatePath);
+  }
+}
+
 /**
  * Cleans the specified template by removing designated folders and files.
  * @param params - Parameters containing the target folder, project name, and optional extra edits.
+ * @returns The template paths it expected and did not find.
  */
 export async function cleanTemplate({
   targetFolder,
@@ -34,79 +45,61 @@ export async function cleanTemplate({
   displayName: string;
   appIndex?: number;
   adminEmail?: string;
-}): Promise<void> {
+}): Promise<string[]> {
   // Change the current working directory to targetFolder if not already set
   if (process.cwd() !== targetFolder) {
     process.chdir(targetFolder);
   }
 
-  return new Promise<void>((resolve, reject) => {
-    (async () => {
-      try {
-        // Copy specified files
-        for (const [src, dest] of Object.entries(TO_COPY)) {
-          const srcAbsolutePath = path.resolve(targetFolder, src);
-          const destAbsolutePath = path.resolve(targetFolder, dest);
-          await copyFile(srcAbsolutePath, destAbsolutePath);
-        }
+  const missing: string[] = [];
+  try {
+    // Copy specified files
+    for (const [src, dest] of Object.entries(TO_COPY)) {
+      await unlessMissing(missing, src, () =>
+        copyFile(path.resolve(targetFolder, src), path.resolve(targetFolder, dest)),
+      );
+    }
 
-        await writeReadme(targetFolder, displayName, appIndex);
-        await writeAgentEntry(targetFolder);
+    await unlessMissing(missing, QUICKSTART, () => writeReadme(targetFolder, displayName, appIndex));
+    await writeAgentEntry(targetFolder);
 
-        // Replace config.default.ts with interpolated placeholder config
-        await applyPlaceholderConfig(targetFolder, projectName, displayName, appIndex);
+    // Replace config.default.ts with interpolated placeholder config
+    await unlessMissing(missing, PLACEHOLDER_CONFIG, () =>
+      applyPlaceholderConfig(targetFolder, projectName, displayName, appIndex),
+    );
 
-        // Reset release/versioning state so the fork starts under its own identity
-        await resetReleaseState(targetFolder, projectName);
+    // Reset release/versioning state so the app starts under its own identity
+    await resetReleaseState(targetFolder, projectName, missing);
 
-        // Drop the template's own list of downstream repos from the sync config
-        await removeTemplateForks(targetFolder);
+    // Drop the template's own list of downstream repos from the sync config
+    await unlessMissing(missing, SYNC_CONFIG, () => removeTemplateForks(targetFolder));
 
-        // Generate the app's .env from the template's .env.example: at the repo root, or in backend/ for a template from
-        // before that move. The mode configs (config.development.ts and its siblings) derive from config.default.ts and
-        // stay as the template ships them.
-        const replacements = getBackendEnvReplacements(adminEmail);
-        const rootEnv = await generateEnvFromExample(path.resolve(targetFolder, '.env.example'), replacements);
-        const appEnv =
-          rootEnv ?? (await generateEnvFromExample(path.resolve(targetFolder, 'backend/.env.example'), replacements));
-        if (appEnv) {
-          await fs.writeFile(path.resolve(targetFolder, rootEnv ? '.env' : 'backend/.env'), appEnv, 'utf8');
-        }
+    // Generate the app's .env from the template's .env.example. The mode configs (config.development.ts and its
+    // siblings) derive from config.default.ts and stay as the template ships them.
+    const appEnv = await generateEnvFromExample(
+      path.resolve(targetFolder, '.env.example'),
+      getBackendEnvReplacements(adminEmail),
+    );
+    if (appEnv === null) missing.push('.env.example');
+    else await fs.writeFile(path.resolve(targetFolder, '.env'), appEnv, 'utf8');
 
-        // Clean specified folder contents
-        await Promise.all(
-          TO_CLEAN.map((folderPath) => {
-            const absolutePath = path.resolve(targetFolder, folderPath);
-            return removeFolderContents(absolutePath);
-          }),
-        );
-
-        // Remove specified files and folders
-        await Promise.all(
-          TO_REMOVE.map((filePath) => {
-            const absolutePath = path.resolve(targetFolder, filePath);
-            return removeFileOrFolder(absolutePath);
-          }),
-        );
-
-        resolve();
-      } catch (err) {
-        reject(`Error during the cleaning process: ${err}`);
-      }
-    })();
-  });
+    for (const folderPath of TO_CLEAN) {
+      await unlessMissing(missing, folderPath, () => removeFolderContents(path.resolve(targetFolder, folderPath)));
+    }
+    for (const filePath of TO_REMOVE) {
+      await unlessMissing(missing, filePath, () => fs.rm(path.resolve(targetFolder, filePath), { recursive: true }));
+    }
+  } catch (err) {
+    throw new Error(`Error during the cleaning process: ${err instanceof Error ? err.message : err}`);
+  }
+  return missing;
 }
 
 /** Write the app's README from the template's quickstart. A template without one keeps its own README. */
 async function writeReadme(targetFolder: string, displayName: string, appIndex: number): Promise<void> {
-  try {
-    const quickstart = await fs.readFile(path.resolve(targetFolder, QUICKSTART), 'utf8');
-    const readme = quickstartToReadme(quickstart, displayName, appIndex);
-    await fs.writeFile(path.resolve(targetFolder, 'README.md'), readme, 'utf8');
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    console.info(`\n${warningMark} "${QUICKSTART}" not found > Skip README`);
-  }
+  const quickstart = await fs.readFile(path.resolve(targetFolder, QUICKSTART), 'utf8');
+  const readme = quickstartToReadme(quickstart, displayName, appIndex);
+  await fs.writeFile(path.resolve(targetFolder, 'README.md'), readme, 'utf8');
 }
 
 /** Point coding agents at the template's rules and skills, which sit in `cella/`, out of a root they would not search. */
@@ -132,50 +125,15 @@ async function writeAgentEntry(targetFolder: string): Promise<void> {
  * @param folderPath - The path of the folder to clean.
  */
 async function removeFolderContents(folderPath: string): Promise<void> {
-  // List all files in the folder. Skip silently if the folder doesn't exist —
-  // the template may not include every optional folder (e.g. backend/drizzle).
-  let files: string[];
-  try {
-    files = await fs.readdir(folderPath);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
-    throw err;
-  }
-
-  // `recursive: true` handles nested folders; `force: true` ignores races/missing entries.
+  const files = await fs.readdir(folderPath);
   await Promise.all(files.map((file) => fs.rm(path.join(folderPath, file), { recursive: true, force: true })));
 }
 
-/**
- * Removes a specified file or folder.
- * @param pathToRemove - The path to the file or folder to remove.
- */
-async function removeFileOrFolder(pathToRemove: string): Promise<void> {
-  await fs.rm(pathToRemove, { recursive: true, force: true });
-}
-
-/**
- * Helper function to copy files if the source exists.
- * @param src - The source file path.
- * @param dest - The destination file path.
- */
+/** Copy a file, making the destination's folder when it has none. */
 async function copyFile(src: string, dest: string): Promise<void> {
-  try {
-    // Check if the source file exists
-    await fs.access(src);
-
-    // Ensure the destination directory exists
-    await fs.mkdir(path.dirname(dest), { recursive: true });
-
-    // Copy the file
-    await fs.copyFile(src, dest);
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.info(`\n${warningMark} Source file "${src}" does not exist > Skip copy`);
-    } else {
-      throw err;
-    }
-  }
+  await fs.access(src);
+  await fs.mkdir(path.dirname(dest), { recursive: true });
+  await fs.copyFile(src, dest);
 }
 
 /**
@@ -193,20 +151,12 @@ async function applyPlaceholderConfig(
   const src = path.resolve(targetFolder, PLACEHOLDER_CONFIG);
   const dest = path.resolve(targetFolder, './shared/config/config.default.ts');
 
-  try {
-    let content = await fs.readFile(src, 'utf8');
-    content = content.replaceAll('__project_name__', displayName);
-    content = content.replaceAll('__project_slug__', projectName);
-    content = setDevAppIndex(content, appIndex);
-    await fs.writeFile(dest, content, 'utf8');
-    await fs.rm(src, { force: true });
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.info(`\n${warningMark} Fork config template "${src}" not found > Skip`);
-    } else {
-      throw err;
-    }
-  }
+  let content = await fs.readFile(src, 'utf8');
+  content = content.replaceAll('__project_name__', displayName);
+  content = content.replaceAll('__project_slug__', projectName);
+  content = setDevAppIndex(content, appIndex);
+  await fs.writeFile(dest, content, 'utf8');
+  await fs.rm(src, { force: true });
 }
 
 /**
@@ -227,17 +177,9 @@ export function stripForks(source: string): string {
  */
 async function removeTemplateForks(targetFolder: string): Promise<void> {
   const configPath = path.resolve(targetFolder, SYNC_CONFIG);
-  try {
-    const source = await fs.readFile(configPath, 'utf8');
-    const stripped = stripForks(source);
-    if (stripped !== source) await fs.writeFile(configPath, stripped, 'utf8');
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.info(`\n${warningMark} "${SYNC_CONFIG}" not found > Skip forks removal`);
-    } else {
-      throw err;
-    }
-  }
+  const source = await fs.readFile(configPath, 'utf8');
+  const stripped = stripForks(source);
+  if (stripped !== source) await fs.writeFile(configPath, stripped, 'utf8');
 }
 
 /**
@@ -251,7 +193,7 @@ async function removeTemplateForks(targetFolder: string): Promise<void> {
  *   keeps as upstream reference; the fork's own releases write to a fresh root changelog)
  * - `CHANGELOG.md` → fresh stub
  */
-async function resetReleaseState(targetFolder: string, projectName: string): Promise<void> {
+async function resetReleaseState(targetFolder: string, projectName: string, missing: string[]): Promise<void> {
   // Root package.json: rewrite only the top-level fields in place to avoid reformatting
   // the whole file. Set name/version to the fork's identity, then blank out the upstream
   // cella metadata (license, repository, description, keywords, author, homepage) while
@@ -269,11 +211,8 @@ async function resetReleaseState(targetFolder: string, projectName: string): Pro
     pkg = pkg.replace(/^(\s*"keywords":\s*)\[[^\]]*\]/m, '$1[]');
     await fs.writeFile(pkgPath, pkg, 'utf8');
   } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.info(`\n${warningMark} "package.json" not found > Skip version reset`);
-    } else {
-      throw err;
-    }
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    missing.push('package.json');
   }
 
   // Point release-please at a root CHANGELOG.md for the fork. The upstream Cella
@@ -288,11 +227,8 @@ async function resetReleaseState(targetFolder: string, projectName: string): Pro
     config.packages['.']['changelog-path'] = 'CHANGELOG.md';
     await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
   } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.info(`\n${warningMark} "release-please-config.json" not found > Skip changelog path reset`);
-    } else {
-      throw err;
-    }
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    missing.push('.github/release-please-config.json');
   }
 
   // Reset the release-please manifest and changelog. `force: true` writes even if absent.

@@ -19,9 +19,10 @@ import { fetchLatestRelease } from '#/utils/fetch-template-metadata';
 describe('create-cella e2e', () => {
   const projectName = `cella-e2e-test-${Date.now()}`;
   const targetFolder = join(tmpdir(), projectName);
+  let missing: string[] = [];
 
   beforeAll(async () => {
-    await create({
+    missing = await create({
       projectName,
       targetFolder,
       packageManager: 'pnpm',
@@ -39,6 +40,10 @@ describe('create-cella e2e', () => {
   }, 60000); // Removing the scaffold can take a while
 
   describe('project structure', () => {
+    it('should find every template path it expects', () => {
+      expect(missing).toEqual([]);
+    });
+
     it('should create essential directories', () => {
       expect(existsSync(join(targetFolder, 'backend'))).toBe(true);
       expect(existsSync(join(targetFolder, 'frontend'))).toBe(true);
@@ -62,13 +67,7 @@ describe('create-cella e2e', () => {
 
   describe('.env files', () => {
     it('should have one .env with the admin email and no port: ports follow the shared config', () => {
-      // At the repo root, or in backend/ for a template from before that move.
-      const envPath = [join(targetFolder, '.env'), join(targetFolder, 'backend', '.env')].find((path) =>
-        existsSync(path),
-      );
-      expect(envPath).toBeDefined();
-
-      const content = readFileSync(envPath ?? '', 'utf-8');
+      const content = readFileSync(join(targetFolder, '.env'), 'utf-8');
       expect(content).toContain(`ADMIN_EMAIL=admin@${projectName}.example.com`);
       expect(content).not.toMatch(/^(PROJECT_SLUG|DB_PORT|DB_TEST_PORT|PORT)=/m);
     });

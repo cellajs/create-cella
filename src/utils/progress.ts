@@ -53,6 +53,8 @@ export function createProgress(title: string, silent = false): ProgressTracker {
   const spinner = ora({
     text: title,
     isSilent: silent,
+    // The terminal turns ctrl-c into SIGINT; ora's raw mode drops it when no prompt has read stdin yet
+    discardStdin: false,
   });
 
   activeSpinner = spinner;
