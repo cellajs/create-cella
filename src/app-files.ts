@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import type { Answers } from './answers';
 import { appPorts } from './dev-ports';
 import { warn } from './display';
@@ -13,6 +13,40 @@ const agentFiles: Record<string, string> = {
     '# Agent guidelines\n\nThis app is built from the cella template. Read [cella/AGENTS.md](./cella/AGENTS.md) before changing code: it holds the project rules. Skills, such as `add-entity`, live in [cella/skills](./cella/skills).\n',
   'CLAUDE.md': '@cella/AGENTS.md\n',
 };
+
+const manifestPath = 'cella/create-cella.json';
+const editNames = [
+  'quickstart',
+  'configTemplate',
+  'config',
+  'cliConfig',
+  'envExample',
+  'releaseConfig',
+  'releaseManifest',
+] as const;
+
+/** The template paths a new app changes, as the template itself names them in `cella/create-cella.json`. */
+interface Manifest {
+  remove: string[];
+  empty: string[];
+  /** Template path to the copy's path in the app. */
+  copy: Record<string, string>;
+  /** Template path to the symlink's path in the app. */
+  link: Record<string, string>;
+  edit: Record<(typeof editNames)[number], string>;
+}
+
+/** @throws When the template has no manifest, or its manifest names no path for an edit this version makes. */
+async function readManifest(targetFolder: string): Promise<Manifest> {
+  const source = await fs.readFile(join(targetFolder, manifestPath), 'utf8').catch(() => null);
+  if (source === null) throw new Error(`This template has no ${manifestPath}: use a newer template.`);
+  const manifest: Manifest = JSON.parse(source);
+  const unnamed = editNames.filter((name) => typeof manifest.edit?.[name] !== 'string');
+  if (unnamed.length > 0) {
+    throw new Error(`${manifestPath} names no path for ${unnamed.join(', ')}: use a newer template.`);
+  }
+  return manifest;
+}
 
 /**
  * Turn the template's files in `targetFolder` into the app's: its name, index and admin email in the config and the
@@ -34,22 +68,23 @@ export async function writeAppFiles({ targetFolder, name, appIndex, adminEmail }
   const rewrite = (path: string, change: (source: string) => string) =>
     edit(path, async (file) => fs.writeFile(file, change(await fs.readFile(file, 'utf8')), 'utf8'));
   const displayName = name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const { remove, empty, copy, link, edit: paths } = await readManifest(targetFolder);
 
   try {
-    await edit('frontend/.env.example', (file) => fs.copyFile(file, at('frontend/.env')));
-    await edit('cella/QUICKSTART.md', async (file) =>
+    for (const [from, to] of Object.entries(copy)) await edit(from, (file) => fs.copyFile(file, at(to)));
+    await edit(paths.quickstart, async (file) =>
       fs.writeFile(at('README.md'), quickstartToReadme(await fs.readFile(file, 'utf8'), displayName, appIndex), 'utf8'),
     );
-    await writeAgentEntry(targetFolder);
+    await writeAgentEntry(targetFolder, link);
 
     // The placeholder config becomes the app's default config, and goes
-    await edit('shared/config/config.template.ts', async (file) => {
+    await edit(paths.configTemplate, async (file) => {
       const source = await fs.readFile(file, 'utf8');
       const config = source
         .replaceAll('__project_name__', displayName)
         .replaceAll('__project_slug__', name)
         .replace(/^(\s*devAppIndex:\s*)\d+/m, (_, head: string) => `${head}${appIndex}`);
-      await fs.writeFile(at('shared/config/config.default.ts'), config, 'utf8');
+      await fs.writeFile(at(paths.config), config, 'utf8');
       await fs.rm(file);
     });
 
@@ -65,32 +100,32 @@ export async function writeAppFiles({ targetFolder, name, appIndex, adminEmail }
       return pkg;
     });
     // The template keeps its changelog in its docs folder, which the app keeps as upstream reference
-    await rewrite('.github/release-please-config.json', (source) => {
+    await rewrite(paths.releaseConfig, (source) => {
       const config = JSON.parse(source) as { packages?: Record<string, Record<string, unknown>> };
       config.packages ??= {};
       config.packages['.'] ??= {};
       config.packages['.']['changelog-path'] = 'CHANGELOG.md';
       return `${JSON.stringify(config, null, 2)}\n`;
     });
-    await edit('.github/release-please-manifest.json', (file) =>
-      fs.writeFile(file, `{\n  ".": "${initialVersion}"\n}\n`, 'utf8'),
-    );
+    await edit(paths.releaseManifest, (file) => fs.writeFile(file, `{\n  ".": "${initialVersion}"\n}\n`, 'utf8'));
     await fs.writeFile(at('CHANGELOG.md'), '# Changelog\n', 'utf8');
 
     // `pnpm cella upgrade` never merges this file, so the list goes once here
-    await rewrite('cella/cella.config.ts', stripForks);
+    await rewrite(paths.cliConfig, stripForks);
     // Every port follows `devAppIndex` in the config, so the admin is the one value the app's `.env` changes
-    await edit('.env.example', async (file) => {
+    await edit(paths.envExample, async (file) => {
       const env = (await fs.readFile(file, 'utf8')).replace(/^ADMIN_EMAIL=.*$/gm, () => `ADMIN_EMAIL=${adminEmail}`);
-      await fs.writeFile(at('.env'), env, 'utf8');
+      await fs.writeFile(file.replace(/\.example$/, ''), env, 'utf8');
     });
 
-    await edit('backend/drizzle', async (folder) => {
-      const entries = await fs.readdir(folder);
-      await Promise.all(entries.map((entry) => fs.rm(join(folder, entry), { recursive: true, force: true })));
-    });
-    // The template's stack file carries its own bootstrap markers and encryption salt; an app bootstraps its own
-    await edit('infra/Pulumi.production.yaml', (file) => fs.rm(file));
+    // What an app starts without: the template's own migrations, and its stack file with the template's encryption salt
+    for (const folder of empty) {
+      await edit(folder, async (dir) => {
+        const entries = await fs.readdir(dir);
+        await Promise.all(entries.map((entry) => fs.rm(join(dir, entry), { recursive: true, force: true })));
+      });
+    }
+    for (const path of remove) await edit(path, (file) => fs.rm(file, { recursive: true }));
   } catch (error) {
     throw new Error(`Error during the cleaning process: ${error instanceof Error ? error.message : error}`);
   }
@@ -111,18 +146,21 @@ function quickstartToReadme(source: string, displayName: string, appIndex: numbe
 }
 
 /** Point coding agents at the template's rules and skills, which sit in `cella/`, out of a root they would not search. */
-async function writeAgentEntry(targetFolder: string): Promise<void> {
+async function writeAgentEntry(targetFolder: string, link: Manifest['link']): Promise<void> {
   await Promise.all(
     Object.entries(agentFiles).map(([file, content]) => fs.writeFile(join(targetFolder, file), content, 'utf8')),
   );
 
   // Local to this clone: `.claude` is gitignored, and the check scripts read tracked paths as files. AGENTS.md names the folder for a new clone.
-  try {
-    await fs.mkdir(join(targetFolder, '.claude'), { recursive: true });
-    await fs.symlink('../cella/skills', join(targetFolder, '.claude/skills'));
-  } catch (error) {
-    // Windows refuses a symlink without developer mode; the skills stay readable under cella/skills
-    warn(`skipped .claude/skills: ${error instanceof Error ? error.message : String(error)}`);
+  for (const [target, path] of Object.entries(link)) {
+    const file = join(targetFolder, path);
+    try {
+      await fs.mkdir(dirname(file), { recursive: true });
+      await fs.symlink(relative(dirname(file), join(targetFolder, target)), file);
+    } catch (error) {
+      // Windows refuses a symlink without developer mode; the skills stay readable in their own folder
+      warn(`skipped ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }
 

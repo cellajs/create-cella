@@ -32,6 +32,8 @@ pnpm create @cellajs/cella [directory] [options]
 4. Initializes a fresh git repository with an initial commit
 5. Adds the cella upstream remote for `pnpm cella upgrade`
 
+The template names the files step 3 changes in its `cella/create-cella.json`. A template without that file is refused.
+
 ## Development
 
 ```bash
