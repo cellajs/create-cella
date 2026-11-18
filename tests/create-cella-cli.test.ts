@@ -16,6 +16,25 @@ describe('a failed create', () => {
     // A folder where the app's changelog goes fails the run after the template's files are copied
     mkdirSync(join(template, 'CHANGELOG.md'), { recursive: true });
     writeFileSync(join(template, 'CHANGELOG.md', 'keep'), '');
+    // The manifest a template needs to get that far; the files it names are absent, so their edits are skipped
+    const names = [
+      'quickstart',
+      'configTemplate',
+      'config',
+      'cliConfig',
+      'envExample',
+      'releaseConfig',
+      'releaseManifest',
+    ];
+    const manifest = {
+      remove: [],
+      empty: [],
+      copy: {},
+      link: {},
+      edit: Object.fromEntries(names.map((name) => [name, `absent/${name}`])),
+    };
+    mkdirSync(join(template, 'cella'));
+    writeFileSync(join(template, 'cella', 'create-cella.json'), JSON.stringify(manifest));
     await git.init({ fs, dir: template });
     await git.add({ fs, dir: template, filepath: '.' });
     await git.commit({ fs, dir: template, message: 'template', author: { name: 'test', email: 'test@example.com' } });
