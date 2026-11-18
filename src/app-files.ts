@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, posix, relative } from 'node:path';
 import type { Answers } from './answers';
 import { appPorts } from './dev-ports';
 import { warn } from './display';
@@ -73,7 +73,11 @@ export async function writeAppFiles({ targetFolder, name, appIndex, adminEmail }
   try {
     for (const [from, to] of Object.entries(copy)) await edit(from, (file) => fs.copyFile(file, at(to)));
     await edit(paths.quickstart, async (file) =>
-      fs.writeFile(at('README.md'), quickstartToReadme(await fs.readFile(file, 'utf8'), displayName, appIndex), 'utf8'),
+      fs.writeFile(
+        at('README.md'),
+        quickstartToReadme(await fs.readFile(file, 'utf8'), paths.quickstart, displayName, appIndex),
+        'utf8',
+      ),
     );
     await writeAgentEntry(targetFolder, link);
 
@@ -99,7 +103,7 @@ export async function writeAppFiles({ targetFolder, name, appIndex, adminEmail }
       }
       return pkg;
     });
-    // The template keeps its changelog in its docs folder, which the app keeps as upstream reference
+    // The template keeps its changelog in `cella/`, which the app keeps as upstream reference
     await rewrite(paths.releaseConfig, (source) => {
       const config = JSON.parse(source) as { packages?: Record<string, Record<string, unknown>> };
       config.packages ??= {};
@@ -134,14 +138,14 @@ export async function writeAppFiles({ targetFolder, name, appIndex, adminEmail }
 
 /**
  * The quickstart as the README of a new app: at the repo root, with this app's port and without the step that just ran.
- * Its links are relative to `cella/` in the template, so `./x` becomes `./cella/x` and `../x` becomes `./x`.
+ * Its relative links resolve from the quickstart's folder in the template (`path`), and are rewritten from the root.
  */
-function quickstartToReadme(source: string, displayName: string, appIndex: number): string {
+function quickstartToReadme(source: string, path: string, displayName: string, appIndex: number): string {
+  const folder = posix.dirname(path);
   return source
     .replace(/^# .*$/m, `# ${displayName}`)
     .replace(/^## Create\n[\s\S]*?(?=^## )/m, '')
-    .replaceAll('](./', '](./cella/')
-    .replaceAll('](../', '](./')
+    .replace(/\]\((\.\.?\/[^)\s]*)\)/g, (_, target: string) => `](./${posix.join(folder, target)})`)
     .replaceAll('http://localhost:3000', `http://localhost:${appPorts(appIndex).frontend}`);
 }
 
