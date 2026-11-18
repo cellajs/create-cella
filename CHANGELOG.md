@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/cellajs/create-cella/compare/create-cella-0.6.0...create-cella-0.6.1) (2026-11-18)
+
+
+### 🐞 Bug fixes
+
+* a new app's README resolves the quickstart's links from the quickstart's own folder ([#57](https://github.com/cellajs/create-cella/issues/57)) ([4a4b2b0](https://github.com/cellajs/create-cella/commit/4a4b2b093eac77e6987aff3b57e839db4ed5f4a5))
+
 ## [0.6.0](https://github.com/cellajs/create-cella/compare/create-cella-0.5.1...create-cella-0.6.0) (2026-11-14)
 
 
