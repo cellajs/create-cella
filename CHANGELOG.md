@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/cellajs/create-cella/compare/create-cella-0.6.1...create-cella-0.6.2) (2026-11-18)
+
+
+### 🐞 Bug fixes
+
+* **test:** the failed-create template carries a manifest, so the run fails where the test expects ([#59](https://github.com/cellajs/create-cella/issues/59)) ([141712a](https://github.com/cellajs/create-cella/commit/141712ad4dc4b25a19d4c3dff94f27eb7c014512))
+
 ## [0.6.1](https://github.com/cellajs/create-cella/compare/create-cella-0.6.0...create-cella-0.6.1) (2026-11-18)
 
 
